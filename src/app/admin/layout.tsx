@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { LayoutDashboard, Package, ShoppingCart, LogOut, Menu, X } from "lucide-react";
+import { AdminRoleProvider, StaffRole } from "@/lib/adminRole";
+import { LayoutDashboard, Package, ShoppingCart, LogOut, Menu, X, Users } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [sideOpen, setSideOpen] = useState(false);
+  const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -19,13 +21,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       const { data: role } = await supabase
         .from("user_roles")
-        .select("id")
+        .select("id, role")
         .eq("user_id", data.user.id)
-        .eq("role", "admin")
+        .in("role", ["admin", "cashier"])
         .maybeSingle();
 
       if (!role) { router.replace("/"); return; }
 
+      setStaffRole(role.role as StaffRole);
       setLoading(false);
     });
   }, [router]);
@@ -40,13 +43,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return <div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-[var(--gold)] border-t-transparent rounded-full animate-spin" /></div>;
   }
 
+  if (!staffRole) return null;
+
   const links = [
     { href: "/admin", label: "Дашборд", icon: LayoutDashboard },
     { href: "/admin/products", label: "Товары", icon: Package },
     { href: "/admin/orders", label: "Заказы", icon: ShoppingCart },
+    ...(staffRole === "admin" ? [{ href: "/admin/staff", label: "Сотрудники", icon: Users }] : []),
   ];
 
   return (
+    <AdminRoleProvider role={staffRole}>
     <div className="min-h-screen flex">
       {/* Sidebar overlay */}
       {sideOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSideOpen(false)} />}
@@ -81,5 +88,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </div>
     </div>
+    </AdminRoleProvider>
   );
 }

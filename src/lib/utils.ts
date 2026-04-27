@@ -6,7 +6,23 @@ export function formatPrice(price: number): string {
   }).format(price);
 }
 
+export const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending_payment: "Ожидает оплаты",
+  paid: "Оплачено",
+  failed: "Ошибка оплаты",
+  refunded: "Возврат",
+};
+
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  new: "Новый",
+  confirmed: "Подтвержден",
+  shipped: "В доставке",
+  delivered: "Доставлен",
+  cancelled: "Отменен",
+};
+
 export function buildWhatsAppMessage(
+  invoiceNumber: string,
   items: {
     name: string;
     brand: string;
@@ -14,35 +30,38 @@ export function buildWhatsAppMessage(
     price: number;
     volume_ml: number | null;
   }[],
-  form: {
-    name: string;
-    phone: string;
-    city: string;
-    address: string;
+  customer: {
+    customer_name: string;
+    customer_phone: string;
+    customer_city: string;
+    customer_address: string;
     comment?: string;
   },
-  total: number
+  totalPrice: number,
+  paymentStatus = "pending_payment"
 ): string {
   const lines = [
-    "🌸 *Новый заказ — Aura Parfum*",
+    "*Aura Parfum invoice*",
+    `Invoice: ${invoiceNumber}`,
+    `Payment status: ${PAYMENT_STATUS_LABELS[paymentStatus] || paymentStatus}`,
     "",
-    "*Товары:*",
+    "*Customer:*",
+    `Name: ${customer.customer_name}`,
+    `Phone: ${customer.customer_phone}`,
+    `City: ${customer.customer_city}`,
+    `Address: ${customer.customer_address}`,
+    "",
+    "*Items:*",
     ...items.map(
       (item) =>
-        `• ${item.brand} ${item.name}${item.volume_ml ? ` ${item.volume_ml}мл` : ""} × ${item.quantity} = ${formatPrice(item.price * item.quantity)}`
+        `- ${item.brand} ${item.name}${item.volume_ml ? ` ${item.volume_ml}ml` : ""} x ${item.quantity} = ${formatPrice(item.price * item.quantity)}`
     ),
     "",
-    `*Итого:* ${formatPrice(total)}`,
-    "",
-    "*Данные клиента:*",
-    `👤 Имя: ${form.name}`,
-    `📞 Телефон: ${form.phone}`,
-    `🏙 Город: ${form.city}`,
-    `📍 Адрес: ${form.address}`,
+    `*Total:* ${formatPrice(totalPrice)}`,
   ];
 
-  if (form.comment) {
-    lines.push(`💬 Комментарий: ${form.comment}`);
+  if (customer.comment) {
+    lines.push(`Comment: ${customer.comment}`);
   }
 
   return encodeURIComponent(lines.join("\n"));

@@ -14,10 +14,10 @@ export default function AdminDashboard() {
       const supabase = createClient();
       const [prodRes, ordRes] = await Promise.all([
         supabase.from("products").select("id", { count: "exact", head: true }),
-        supabase.from("orders").select("total"),
+        supabase.from("orders").select("total_price"),
       ]);
       const orders = ordRes.data || [];
-      const revenue = orders.reduce((s, o) => s + Number(o.total), 0);
+      const revenue = orders.reduce((s, o) => s + Number(o.total_price), 0);
       setStats({
         products: prodRes.count || 0,
         orders: orders.length,

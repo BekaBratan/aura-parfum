@@ -24,14 +24,16 @@ export interface OrderItem {
 
 export interface Order {
   id: string;
-  name: string;
-  phone: string;
-  city: string;
-  address: string;
+  invoice_number: string;
+  payment_status: "pending_payment" | "paid" | "failed" | "refunded";
+  order_status: "new" | "confirmed" | "shipped" | "delivered" | "cancelled";
+  customer_phone: string;
+  customer_name: string;
+  customer_city: string;
+  customer_address: string;
   comment: string | null;
   items: OrderItem[];
-  total: number;
-  status: "new" | "confirmed" | "shipped" | "delivered" | "cancelled";
+  total_price: number;
   created_at: string;
 }
 
