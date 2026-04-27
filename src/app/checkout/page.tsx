@@ -39,14 +39,14 @@ export default function CheckoutPage() {
 
   if (items.length === 0) {
     return (
-      <div className="pt-24 pb-16 text-center">
-        <div className="max-w-md mx-auto">
-          <div className="w-20 h-20 rounded-full bg-[var(--dark-3)] flex items-center justify-center mx-auto mb-6">
-            <ShoppingBag size={36} className="text-[var(--text-secondary)]" />
+      <div className="empty-state">
+        <div className="empty-state-inner">
+          <div className="empty-icon">
+            <ShoppingBag size={34} />
           </div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-2">Cart is empty</h1>
-          <Link href="/catalog" className="btn-gold px-8 py-3 rounded-full text-sm inline-block">
-            <span>Continue shopping</span>
+          <h1 className="section-title">Корзина пуста</h1>
+          <Link href="/catalog" className="btn btn-primary">
+            Продолжить покупки
           </Link>
         </div>
       </div>
@@ -54,7 +54,7 @@ export default function CheckoutPage() {
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+    setForm((current) => ({ ...current, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -160,74 +160,77 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="pt-24 pb-16">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6">
-        <Link href="/cart" className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors mb-8">
-          <ArrowLeft size={16} /> Back to cart
+    <div className="checkout-layout">
+      <div className="site-container">
+        <Link href="/cart" className="back-link">
+          <ArrowLeft size={16} /> Назад в корзину
         </Link>
 
-        <div className="mb-8">
-          <p className="text-xs uppercase tracking-widest text-[var(--gold)] mb-1">Final step</p>
-          <h1 className="text-3xl font-bold text-[var(--text-primary)]">Checkout</h1>
-        </div>
-
-        <div className="glass-card p-4 mb-6">
-          <h3 className="text-sm font-semibold text-[var(--gold)] mb-3 uppercase tracking-wider">Your order</h3>
-          <div className="space-y-2 mb-3">
-            {items.map((item) => (
-              <div key={item.product_id} className="flex justify-between gap-4 text-sm">
-                <span className="text-[var(--text-secondary)] truncate max-w-[60%]">
-                  {item.brand} {item.name} {item.volume_ml ? `${item.volume_ml}ml` : ""} x {item.quantity}
-                </span>
-                <span className="text-[var(--text-primary)] font-medium">{formatPrice(item.price * item.quantity)}</span>
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-[var(--border)] pt-3 flex justify-between">
-            <span className="font-semibold">Total</span>
-            <span className="text-lg font-bold text-gold-gradient">{formatPrice(totalPrice())}</span>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {[
-            { name: "customer_name", label: "Name *", placeholder: "Your name", type: "text" },
-            { name: "customer_phone", label: "Phone *", placeholder: "+7 (___) ___-__-__", type: "tel" },
-            { name: "customer_city", label: "City *", placeholder: "Almaty", type: "text" },
-            { name: "customer_address", label: "Delivery address *", placeholder: "Street, house, apartment", type: "text" },
-          ].map((field) => (
-            <div key={field.name}>
-              <label className="text-xs text-[var(--text-secondary)] mb-1 block">{field.label}</label>
-              <input
-                type={field.type}
-                name={field.name}
-                value={form[field.name as keyof typeof form]}
-                onChange={handleChange}
-                placeholder={field.placeholder}
-                className="input-dark"
-                required
-              />
-            </div>
-          ))}
-
+        <div className="checkout-header">
           <div>
-            <label className="text-xs text-[var(--text-secondary)] mb-1 block">Comment</label>
-            <textarea
-              name="comment"
-              value={form.comment}
-              onChange={handleChange}
-              placeholder="Additional details..."
-              rows={3}
-              className="input-dark resize-none"
-            />
+            <p className="eyebrow">Финальный шаг</p>
+            <h1 className="section-title">Оформление заказа</h1>
           </div>
+        </div>
 
-          <button type="submit" disabled={submitting} className="btn-gold w-full py-3.5 rounded-full text-sm font-semibold tracking-wide flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
-            {submitting ? <Loader2 size={18} className="animate-spin relative z-10" /> : <Send size={18} className="relative z-10" />}
-            <span>{submitting ? "Creating order..." : "Create invoice"}</span>
-          </button>
-          <p className="text-xs text-center text-[var(--text-secondary)]">After checkout, the invoice will open on the website.</p>
-        </form>
+        <div className="checkout-grid">
+          <form onSubmit={handleSubmit} className="card checkout-form">
+            {[
+              { name: "customer_name", label: "Имя *", placeholder: "Ваше имя", type: "text" },
+              { name: "customer_phone", label: "Телефон *", placeholder: "+7 (___) ___-__-__", type: "tel" },
+              { name: "customer_city", label: "Город *", placeholder: "Алматы", type: "text" },
+              { name: "customer_address", label: "Адрес доставки *", placeholder: "Улица, дом, квартира", type: "text" },
+            ].map((field) => (
+              <label key={field.name} className="form-field">
+                <span className="form-label">{field.label}</span>
+                <input
+                  type={field.type}
+                  name={field.name}
+                  value={form[field.name as keyof typeof form]}
+                  onChange={handleChange}
+                  placeholder={field.placeholder}
+                  className="input"
+                  required
+                />
+              </label>
+            ))}
+
+            <label className="form-field">
+              <span className="form-label">Комментарий</span>
+              <textarea
+                name="comment"
+                value={form.comment}
+                onChange={handleChange}
+                placeholder="Дополнительные детали..."
+                rows={3}
+                className="textarea"
+              />
+            </label>
+
+            <button type="submit" disabled={submitting} className="btn btn-primary">
+              {submitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+              {submitting ? "Создаем заказ..." : "Создать счет"}
+            </button>
+          </form>
+
+          <aside className="card order-summary">
+            <h2 className="filter-title">Ваш заказ</h2>
+            <div className="order-items">
+              {items.map((item) => (
+                <div key={item.product_id} className="order-item">
+                  <span>
+                    {item.brand} {item.name} {item.volume_ml ? `${item.volume_ml} мл` : ""} × {item.quantity}
+                  </span>
+                  <strong>{formatPrice(item.price * item.quantity)}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="summary-row order-total-row">
+              <span>Итого</span>
+              <span className="summary-total">{formatPrice(totalPrice())}</span>
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );

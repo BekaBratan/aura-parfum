@@ -21,9 +21,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru">
-      <body>
+      <body className="site-shell">
         <Navbar />
-        <main className="min-h-screen">{children}</main>
+        <main className="site-main">{children}</main>
         <Footer />
         <Toaster
           position="top-right"

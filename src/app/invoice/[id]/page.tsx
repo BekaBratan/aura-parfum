@@ -118,92 +118,90 @@ export default function InvoicePage() {
 
   if (loading) {
     return (
-      <div className="pt-24 pb-16 flex justify-center">
-        <Loader2 className="animate-spin text-[var(--gold)]" />
+      <div className="empty-state">
+        <Loader2 className="animate-spin" />
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="pt-24 pb-16 text-center">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-3">Invoice not found</h1>
-        <Link href="/catalog" className="text-sm text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors">
-          Continue shopping
-        </Link>
+      <div className="empty-state">
+        <div className="empty-state-inner">
+          <h1 className="section-title">Счет не найден</h1>
+          <Link href="/catalog" className="btn btn-secondary">
+            Продолжить покупки
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="pt-24 pb-16">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="invoice-layout">
+      <div className="site-container">
+        <div className="invoice-header">
           <div>
-            <p className="text-xs uppercase tracking-widest text-[var(--gold)] mb-1">Invoice</p>
-            <h1 className="text-3xl font-bold text-[var(--text-primary)]">{order.invoice_number}</h1>
-            <p className="text-sm text-[var(--text-secondary)] mt-2">
+            <p className="eyebrow">Счет</p>
+            <h1 className="section-title">{order.invoice_number}</h1>
+            <p className="section-subtitle">
               {new Date(order.created_at).toLocaleString("ru-RU")}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-secondary)]">
-              Payment: {PAYMENT_STATUS_LABELS[order.payment_status] || order.payment_status}
+          <div className="filter-options">
+            <span className="badge badge-muted">
+              Оплата: {PAYMENT_STATUS_LABELS[order.payment_status] || order.payment_status}
             </span>
-            <span className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-secondary)]">
-              Order: {ORDER_STATUS_LABELS[order.order_status] || order.order_status}
+            <span className="badge badge-muted">
+              Заказ: {ORDER_STATUS_LABELS[order.order_status] || order.order_status}
             </span>
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <div className="glass-card p-5">
-            <h2 className="text-sm font-semibold text-[var(--gold)] uppercase tracking-wider mb-4">Products</h2>
-            <div className="space-y-4">
+        <div className="invoice-grid">
+          <div className="card invoice-card">
+            <h2 className="filter-title">Товары</h2>
+            <div className="invoice-items">
               {order.items.map((item, index) => (
-                <div key={`${item.product_id}-${index}`} className="flex justify-between gap-4 border-b border-[var(--border)]/60 pb-4 last:border-0 last:pb-0">
+                <div key={`${item.product_id}-${index}`} className="invoice-item">
                   <div>
-                    <p className="text-[var(--text-primary)] font-medium">
-                      {item.brand} {item.name}
-                    </p>
-                    <p className="text-sm text-[var(--text-secondary)]">
-                      {item.volume_ml ? `${item.volume_ml}ml · ` : ""}{item.quantity} x {formatPrice(item.price)}
+                    <p className="product-title">{item.brand} {item.name}</p>
+                    <p className="product-meta">
+                      {item.volume_ml ? `${item.volume_ml} мл · ` : ""}{item.quantity} × {formatPrice(item.price)}
                     </p>
                   </div>
-                  <p className="text-[var(--text-primary)] font-semibold whitespace-nowrap">
-                    {formatPrice(item.price * item.quantity)}
-                  </p>
+                  <strong>{formatPrice(item.price * item.quantity)}</strong>
                 </div>
               ))}
             </div>
-            <div className="border-t border-[var(--border)] mt-5 pt-4 flex justify-between">
-              <span className="text-[var(--text-primary)] font-semibold">Total</span>
-              <span className="text-xl font-bold text-gold-gradient">{formatPrice(order.total_price)}</span>
+            <div className="summary-row order-total-row">
+              <span>Итого</span>
+              <span className="summary-total">{formatPrice(order.total_price)}</span>
             </div>
           </div>
 
-          <aside className="glass-card p-5 h-fit">
-            <h2 className="text-sm font-semibold text-[var(--gold)] uppercase tracking-wider mb-4">Customer</h2>
-            <div className="space-y-3 text-sm">
-              <Info label="Name" value={order.customer_name} />
-              <Info label="Phone" value={order.customer_phone} />
-              <Info label="City" value={order.customer_city} />
-              <Info label="Address" value={order.customer_address} />
-              {order.comment && <Info label="Comment" value={order.comment} />}
+          <aside className="card invoice-sidebar">
+            <h2 className="filter-title">Клиент</h2>
+            <div className="info-list">
+              <Info label="Имя" value={order.customer_name} />
+              <Info label="Телефон" value={order.customer_phone} />
+              <Info label="Город" value={order.customer_city} />
+              <Info label="Адрес" value={order.customer_address} />
+              {order.comment && <Info label="Комментарий" value={order.comment} />}
             </div>
 
-            <div className="mt-6 space-y-3">
-              <button onClick={downloadPdf} className="btn-gold w-full py-3 rounded-full text-sm flex items-center justify-center gap-2 cursor-pointer">
-                <Download size={17} className="relative z-10" />
-                <span>Download PDF</span>
+            <div className="invoice-actions">
+              <button onClick={downloadPdf} className="btn btn-primary">
+                <Download size={17} />
+                Скачать PDF
               </button>
-              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="w-full py-3 rounded-full text-sm flex items-center justify-center gap-2 border border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--gold)] transition-colors">
+              <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
                 <Send size={17} />
-                <span>Send to WhatsApp</span>
+                Отправить в WhatsApp
               </a>
-              <Link href="/catalog" className="w-full py-3 rounded-full text-sm flex items-center justify-center gap-2 border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--gold)] hover:border-[var(--gold)] transition-colors">
+              <Link href="/catalog" className="btn btn-secondary">
                 <ShoppingBag size={17} />
-                <span>Continue shopping</span>
+                Продолжить покупки
               </Link>
             </div>
           </aside>
@@ -215,9 +213,9 @@ export default function InvoicePage() {
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-xs text-[var(--text-secondary)]">{label}</p>
-      <p className="text-[var(--text-primary)] break-words">{value}</p>
+    <div className="info-row">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }

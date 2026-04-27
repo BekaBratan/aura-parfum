@@ -8,12 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
 import { formatPrice } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
-import {
-  ShoppingBag,
-  ArrowLeft,
-  Check,
-  X as XIcon,
-} from "lucide-react";
+import { ShoppingBag, ArrowLeft, Check, X as XIcon } from "lucide-react";
 import toast from "react-hot-toast";
 
 export default function ProductPage() {
@@ -54,15 +49,13 @@ export default function ProductPage() {
 
   if (loading) {
     return (
-      <div className="pt-24 pb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid md:grid-cols-2 gap-10">
-          <div className="aspect-square skeleton rounded-2xl" />
-          <div className="space-y-4 pt-4">
-            <div className="h-4 skeleton w-24" />
-            <div className="h-8 skeleton w-3/4" />
-            <div className="h-6 skeleton w-32" />
-            <div className="h-20 skeleton w-full" />
-            <div className="h-12 skeleton w-48 rounded-full" />
+      <div className="product-detail">
+        <div className="site-container product-detail-grid">
+          <div className="product-detail-image skeleton" />
+          <div className="detail-panel">
+            <div className="skeleton skeleton-line is-short" />
+            <div className="skeleton skeleton-line is-full" />
+            <div className="skeleton skeleton-line is-medium" />
           </div>
         </div>
       </div>
@@ -71,98 +64,83 @@ export default function ProductPage() {
 
   if (!product) {
     return (
-      <div className="pt-24 pb-16 text-center">
-        <h1 className="text-2xl text-[var(--text-primary)] mb-4">
-          Товар не найден
-        </h1>
-        <Link href="/catalog" className="text-[var(--gold)] hover:underline">
-          ← Вернуться в каталог
-        </Link>
+      <div className="empty-state">
+        <div className="empty-state-inner">
+          <h1 className="section-title">Товар не найден</h1>
+          <Link href="/catalog" className="btn btn-secondary">
+            Вернуться в каталог
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="pt-24 pb-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Link
-          href="/catalog"
-          className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors mb-8"
-        >
+    <div className="product-detail">
+      <div className="site-container">
+        <Link href="/catalog" className="back-link">
           <ArrowLeft size={16} />
           Назад в каталог
         </Link>
 
-        <div className="grid md:grid-cols-2 gap-8 lg:gap-14">
-          <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--dark-3)] glass-card">
+        <div className="product-detail-grid">
+          <div className="product-detail-image">
             {product.image_url ? (
               <Image
                 src={product.image_url}
                 alt={product.name}
                 fill
-                className="object-cover"
+                className="product-detail-img"
                 sizes="(max-width: 768px) 100vw, 50vw"
                 priority
               />
             ) : (
-              <div className="absolute inset-0 flex items-center justify-center text-[var(--text-secondary)]">
-                <ShoppingBag size={80} strokeWidth={0.8} />
+              <div className="image-placeholder">
+                <div>
+                  <ShoppingBag size={74} strokeWidth={1} />
+                  <span>Aura Parfum</span>
+                </div>
               </div>
             )}
             {product.is_featured && (
-              <span className="absolute top-4 left-4 badge-gold text-xs px-3 py-1">
-                Хит продаж
-              </span>
+              <span className="badge badge-success product-detail-badge">Хит продаж</span>
             )}
           </div>
 
-          <div className="flex flex-col justify-center">
-            <p className="text-xs uppercase tracking-widest text-[var(--gold)] mb-2">
-              {product.brand}
-            </p>
+          <div className="detail-panel">
+            <div>
+              <p className="product-brand">{product.brand}</p>
+              <h1 className="detail-title">{product.name}</h1>
+              {product.volume_ml && <p className="product-meta">{product.volume_ml} мл</p>}
+            </div>
 
-            <h1 className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] mb-2">
-              {product.name}
-            </h1>
-
-            {product.volume_ml && (
-              <p className="text-sm text-[var(--text-secondary)] mb-4">
-                {product.volume_ml} мл
-              </p>
-            )}
-
-            <p className="text-3xl font-bold text-gold-gradient mb-6">
-              {formatPrice(product.price)}
-            </p>
+            <p className="price detail-price">{formatPrice(product.price)}</p>
 
             {product.description && (
-              <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-6 max-w-md">
-                {product.description}
-              </p>
+              <p className="detail-description">{product.description}</p>
             )}
 
-            <div className="glass-card p-4 space-y-3 mb-6">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-[var(--text-secondary)]">Пол</span>
-                <span className="text-[var(--text-primary)] capitalize">
+            <div className="card detail-list">
+              <div className="detail-row">
+                <span>Пол</span>
+                <strong>
                   {product.gender === "men"
                     ? "Мужской"
                     : product.gender === "women"
                     ? "Женский"
                     : "Унисекс"}
-                </span>
+                </strong>
               </div>
-              <div className="border-t border-[var(--border)]" />
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-[var(--text-secondary)]">Наличие</span>
+              <div className="detail-row">
+                <span>Наличие</span>
                 {isAvailable ? (
-                  <span className="flex items-center gap-1 text-green-400">
+                  <strong className="product-availability">
                     <Check size={14} /> В наличии: {productCount} шт.
-                  </span>
+                  </strong>
                 ) : (
-                  <span className="flex items-center gap-1 text-red-400">
+                  <strong className="product-availability is-empty">
                     <XIcon size={14} /> Нет в наличии
-                  </span>
+                  </strong>
                 )}
               </div>
             </div>
@@ -170,16 +148,10 @@ export default function ProductPage() {
             <button
               onClick={handleAdd}
               disabled={!isAvailable}
-              className={`flex items-center justify-center gap-2 py-3.5 px-8 rounded-full text-sm font-semibold tracking-wide transition-all cursor-pointer ${
-                isAvailable
-                  ? "btn-gold"
-                  : "bg-[var(--dark-4)] text-[var(--text-secondary)] cursor-not-allowed"
-              }`}
+              className={`btn ${isAvailable ? "btn-primary" : "btn-secondary"}`}
             >
-              <ShoppingBag size={18} className="relative z-10" />
-              <span>
-                {isAvailable ? "Добавить в корзину" : "Нет в наличии"}
-              </span>
+              <ShoppingBag size={18} />
+              {isAvailable ? "Добавить в корзину" : "Нет в наличии"}
             </button>
           </div>
         </div>

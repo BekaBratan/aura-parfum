@@ -8,19 +8,13 @@ import { usePathname } from "next/navigation";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const totalItems = useCartStore((s) => s.totalItems);
   const pathname = usePathname();
-
-  // Hide navbar on admin pages
   const isAdmin = pathname?.startsWith("/admin");
 
   useEffect(() => {
     setMounted(true);
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
@@ -30,78 +24,44 @@ export default function Navbar() {
   if (isAdmin) return null;
 
   return (
-    <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled
-          ? "bg-[#0d0d0d]/90 backdrop-blur-xl shadow-lg shadow-black/30"
-          : "bg-transparent"
-      }`}
-    >
-      <div className="page-container">
-        <div className="grid grid-cols-[minmax(220px,1fr)_auto_minmax(220px,1fr)] items-center h-[72px]">
-          {/* Logo */}
-          <Link href="/" className="justify-self-start flex items-center gap-2 group min-w-0">
-            <span className="text-2xl sm:text-[28px] font-bold tracking-wide text-gold-gradient"
-              style={{ fontFamily: "'Playfair Display', serif" }}>
-              AZ-ZAHRA
-            </span>
-            <span className="text-xs sm:text-sm font-light tracking-[0.3em] text-[var(--text-secondary)] uppercase mt-1">
-              Parfume
-            </span>
+    <header className="site-header">
+      <div className="site-container">
+        <div className="site-header-inner">
+          <Link href="/" className="site-logo" aria-label="Aura Parfum">
+            <span className="site-logo-mark">AURA</span>
+            <span className="site-logo-text">Parfum</span>
           </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center justify-center gap-8">
-            <Link
-              href="/"
-              className="text-sm tracking-wide text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors duration-300"
-            >
+          <nav className="site-nav" aria-label="Основная навигация">
+            <Link href="/" className="site-nav-link">
               Главная
             </Link>
-            <Link
-              href="/catalog"
-              className="text-sm tracking-wide text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors duration-300"
-            >
+            <Link href="/catalog" className="site-nav-link">
               Каталог
             </Link>
-          </div>
+          </nav>
 
-          {/* Actions */}
-          <div className="justify-self-end flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/catalog"
-              className="p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors"
-              aria-label="Поиск"
-            >
+          <div className="site-actions">
+            <Link href="/catalog" className="icon-button" aria-label="Поиск">
               <Search size={20} />
             </Link>
 
-            <Link
-              href="/cart"
-              className="p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors relative"
-              aria-label="Корзина"
-            >
+            <Link href="/cart" className="icon-button" aria-label="Корзина">
               <ShoppingBag size={20} />
               {mounted && totalItems() > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center badge-gold">
-                  {totalItems()}
-                </span>
+                <span className="cart-count">{totalItems()}</span>
               )}
             </Link>
 
-            <Link
-              href="/auth"
-              className="hidden sm:block p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors"
-              aria-label="Аккаунт"
-            >
+            <Link href="/auth" className="icon-button hidden-mobile" aria-label="Аккаунт">
               <User size={20} />
             </Link>
 
-            {/* Mobile menu */}
             <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="md:hidden p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors"
+              onClick={() => setMenuOpen((open) => !open)}
+              className="icon-button md:hidden"
               aria-label="Меню"
+              aria-expanded={menuOpen}
             >
               {menuOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
@@ -109,33 +69,17 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile dropdown */}
-      <div
-        className={`md:hidden overflow-hidden transition-all duration-300 ${
-          menuOpen ? "max-h-60 opacity-100" : "max-h-0 opacity-0"
-        }`}
-      >
-        <div className="bg-[var(--dark-2)]/95 backdrop-blur-xl border-t border-[var(--border)] px-6 py-4 space-y-3">
-          <Link
-            href="/"
-            className="block text-sm py-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors"
-          >
-            Главная
-          </Link>
-          <Link
-            href="/catalog"
-            className="block text-sm py-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors"
-          >
-            Каталог
-          </Link>
-          <Link
-            href="/auth"
-            className="block text-sm py-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors"
-          >
-            Войти
-          </Link>
-        </div>
+      <div className={`mobile-menu-panel ${menuOpen ? "is-open" : ""}`}>
+        <Link href="/" className="site-nav-link">
+          Главная
+        </Link>
+        <Link href="/catalog" className="site-nav-link">
+          Каталог
+        </Link>
+        <Link href="/auth" className="site-nav-link">
+          Войти
+        </Link>
       </div>
-    </nav>
+    </header>
   );
 }
