@@ -3,7 +3,8 @@
 @import "tailwindcss";
 
 :root {
-  --color-bg: #332c3b;
+  /* --color-bg: #1e2375; */
+  --color-bg: #f8f4ec;
   --color-surface: #ffffff;
   --color-surface-soft: #f1eadf;
   --color-text: #211f1c;
