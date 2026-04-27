@@ -28,8 +28,8 @@ export default function Navbar() {
       <div className="site-container">
         <div className="site-header-inner">
           <Link href="/" className="site-logo" aria-label="Aura Parfum">
-            <span className="site-logo-mark">AURA</span>
-            <span className="site-logo-text">Parfum</span>
+            <span className="site-logo-mark">AZ-ZAHRA</span>
+            <span className="site-logo-text">Parfume</span>
           </Link>
 
           <nav className="site-nav" aria-label="Основная навигация">
