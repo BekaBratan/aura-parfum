@@ -6,10 +6,10 @@ export default function Footer() {
 
   return (
     <footer className="border-t border-[var(--border)] bg-[var(--dark-2)]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="page-container site-footer-inner">
+        <div className="grid grid-cols-1 md:grid-cols-[1.4fr_0.8fr_0.8fr] gap-8 md:gap-12 items-start">
           {/* Brand */}
-          <div>
+          <div className="max-w-sm">
             <h3
               className="text-2xl font-bold text-gold-gradient mb-3"
               style={{ fontFamily: "'Playfair Display', serif" }}
@@ -23,7 +23,7 @@ export default function Footer() {
           </div>
 
           {/* Links */}
-          <div>
+          <div className="md:justify-self-center">
             <h4 className="text-sm font-semibold text-[var(--gold)] uppercase tracking-wider mb-4">
               Навигация
             </h4>
@@ -56,7 +56,7 @@ export default function Footer() {
           </div>
 
           {/* Contact */}
-          <div>
+          <div className="md:justify-self-end md:text-right">
             <h4 className="text-sm font-semibold text-[var(--gold)] uppercase tracking-wider mb-4">
               Контакты
             </h4>
@@ -77,7 +77,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 pt-6 border-t border-[var(--border)] text-center">
+        <div className="mt-8 pt-6 border-t border-[var(--border)] text-center">
           <p className="text-xs text-[var(--text-secondary)]">
             © {new Date().getFullYear()} Aura Parfum. Все права защищены.
           </p>

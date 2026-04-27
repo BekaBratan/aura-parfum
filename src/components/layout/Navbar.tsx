@@ -37,11 +37,11 @@ export default function Navbar() {
           : "bg-transparent"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 sm:h-20">
+      <div className="page-container">
+        <div className="grid grid-cols-[minmax(220px,1fr)_auto_minmax(220px,1fr)] items-center h-[72px]">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <span className="text-2xl sm:text-3xl font-bold tracking-wide text-gold-gradient"
+          <Link href="/" className="justify-self-start flex items-center gap-2 group min-w-0">
+            <span className="text-2xl sm:text-[28px] font-bold tracking-wide text-gold-gradient"
               style={{ fontFamily: "'Playfair Display', serif" }}>
               AZ-ZAHRA
             </span>
@@ -51,7 +51,7 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center justify-center gap-8">
             <Link
               href="/"
               className="text-sm tracking-wide text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors duration-300"
@@ -67,7 +67,7 @@ export default function Navbar() {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="justify-self-end flex items-center gap-2 sm:gap-3">
             <Link
               href="/catalog"
               className="p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors"

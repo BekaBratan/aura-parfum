@@ -33,6 +33,59 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.page-container {
+  width: 100%;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.home-section {
+  padding-top: 56px;
+  padding-bottom: 64px;
+}
+
+.site-footer-inner {
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+.cta-inner {
+  max-width: 768px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.cta-inner p {
+  max-width: 448px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 1024px) {
+  .home-section {
+    padding-top: 64px;
+    padding-bottom: 72px;
+  }
+}
+
+@media (min-width: 640px) {
+  .page-container {
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-container {
+    padding-left: 48px;
+    padding-right: 48px;
+  }
+}
+
 h1,
 h2,
 h3,
