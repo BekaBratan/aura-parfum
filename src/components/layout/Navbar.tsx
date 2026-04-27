@@ -43,7 +43,7 @@ export default function Navbar() {
           <Link href="/" className="flex items-center gap-2 group">
             <span className="text-2xl sm:text-3xl font-bold tracking-wide text-gold-gradient"
               style={{ fontFamily: "'Playfair Display', serif" }}>
-              AURA
+              AZ-ZAHRA
             </span>
             <span className="text-xs sm:text-sm font-light tracking-[0.3em] text-[var(--text-secondary)] uppercase mt-1">
               Parfum
