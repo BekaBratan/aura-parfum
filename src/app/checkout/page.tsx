@@ -9,6 +9,12 @@ import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 
+type ProductStockRow = {
+  id: string;
+  name: string;
+  count: number | null;
+};
+
 export default function CheckoutPage() {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
@@ -63,6 +69,35 @@ export default function CheckoutPage() {
 
     try {
       const supabase = createClient();
+      const productIds = items.map((item) => item.product_id);
+      const { data: stockRows, error: stockError } = await supabase
+        .from("products")
+        .select("id, name, count")
+        .in("id", productIds);
+
+      if (stockError || !stockRows) {
+        toast.error("Не удалось проверить наличие товаров");
+        setSubmitting(false);
+        return;
+      }
+
+      const stockById = new Map(
+        (stockRows as ProductStockRow[]).map((product) => [product.id, product])
+      );
+
+      for (const item of items) {
+        const product = stockById.get(item.product_id);
+        const availableCount = Number(product?.count ?? 0);
+
+        if (!product || item.quantity > availableCount) {
+          toast.error(
+            `Недостаточно товара в наличии: ${item.name}. Доступно: ${availableCount} шт.`
+          );
+          setSubmitting(false);
+          return;
+        }
+      }
+
       const orderItems = items.map((item) => ({
         product_id: item.product_id,
         name: item.name,
@@ -93,6 +128,26 @@ export default function CheckoutPage() {
         toast.error("Could not save order");
         setSubmitting(false);
         return;
+      }
+
+      for (const item of items) {
+        const { error: decrementError } = await supabase.rpc(
+          "decrement_product_count",
+          {
+            p_product_id: item.product_id,
+            p_quantity: item.quantity,
+          }
+        );
+
+        if (decrementError) {
+          const product = stockById.get(item.product_id);
+          const availableCount = Number(product?.count ?? 0);
+          toast.error(
+            `Недостаточно товара в наличии: ${item.name}. Доступно: ${availableCount} шт.`
+          );
+          setSubmitting(false);
+          return;
+        }
       }
 
       clearCart();

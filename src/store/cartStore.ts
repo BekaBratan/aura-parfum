@@ -18,12 +18,15 @@ export const useCartStore = create<CartStore>()(
       items: [],
 
       addItem: (item) => {
+        const availableCount = Number(item.count ?? 0);
+        if (availableCount <= 0) return;
+
         const existing = get().items.find((i) => i.product_id === item.product_id);
         if (existing) {
           set({
             items: get().items.map((i) =>
               i.product_id === item.product_id
-                ? { ...i, quantity: i.quantity + 1 }
+                ? { ...i, count: availableCount, quantity: Math.min(i.quantity + 1, availableCount) }
                 : i
             ),
           });
@@ -43,7 +46,9 @@ export const useCartStore = create<CartStore>()(
         }
         set({
           items: get().items.map((i) =>
-            i.product_id === productId ? { ...i, quantity } : i
+            i.product_id === productId
+              ? { ...i, quantity: Math.min(quantity, Number(i.count ?? 0)) }
+              : i
           ),
         });
       },

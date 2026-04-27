@@ -21,6 +21,8 @@ export default function ProductPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const addItem = useCartStore((s) => s.addItem);
+  const productCount = Number(product?.count ?? 0);
+  const isAvailable = productCount > 0;
 
   useEffect(() => {
     async function load() {
@@ -37,7 +39,7 @@ export default function ProductPage() {
   }, [id]);
 
   const handleAdd = () => {
-    if (!product || !product.in_stock) return;
+    if (!product || !isAvailable) return;
     addItem({
       product_id: product.id,
       name: product.name,
@@ -45,6 +47,7 @@ export default function ProductPage() {
       price: product.price,
       volume_ml: product.volume_ml,
       image_url: product.image_url,
+      count: productCount,
     });
     toast.success(`${product.name} добавлен в корзину`);
   };
@@ -82,7 +85,6 @@ export default function ProductPage() {
   return (
     <div className="pt-24 pb-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Back link */}
         <Link
           href="/catalog"
           className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors mb-8"
@@ -92,7 +94,6 @@ export default function ProductPage() {
         </Link>
 
         <div className="grid md:grid-cols-2 gap-8 lg:gap-14">
-          {/* Image */}
           <div className="relative aspect-square rounded-2xl overflow-hidden bg-[var(--dark-3)] glass-card">
             {product.image_url ? (
               <Image
@@ -115,7 +116,6 @@ export default function ProductPage() {
             )}
           </div>
 
-          {/* Info */}
           <div className="flex flex-col justify-center">
             <p className="text-xs uppercase tracking-widest text-[var(--gold)] mb-2">
               {product.brand}
@@ -141,7 +141,6 @@ export default function ProductPage() {
               </p>
             )}
 
-            {/* Details */}
             <div className="glass-card p-4 space-y-3 mb-6">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-secondary)]">Пол</span>
@@ -156,9 +155,9 @@ export default function ProductPage() {
               <div className="border-t border-[var(--border)]" />
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--text-secondary)]">Наличие</span>
-                {product.in_stock ? (
+                {isAvailable ? (
                   <span className="flex items-center gap-1 text-green-400">
-                    <Check size={14} /> В наличии
+                    <Check size={14} /> В наличии: {productCount} шт.
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-red-400">
@@ -168,19 +167,18 @@ export default function ProductPage() {
               </div>
             </div>
 
-            {/* Add to cart */}
             <button
               onClick={handleAdd}
-              disabled={!product.in_stock}
+              disabled={!isAvailable}
               className={`flex items-center justify-center gap-2 py-3.5 px-8 rounded-full text-sm font-semibold tracking-wide transition-all cursor-pointer ${
-                product.in_stock
+                isAvailable
                   ? "btn-gold"
                   : "bg-[var(--dark-4)] text-[var(--text-secondary)] cursor-not-allowed"
               }`}
             >
               <ShoppingBag size={18} className="relative z-10" />
               <span>
-                {product.in_stock ? "Добавить в корзину" : "Нет в наличии"}
+                {isAvailable ? "Добавить в корзину" : "Нет в наличии"}
               </span>
             </button>
           </div>

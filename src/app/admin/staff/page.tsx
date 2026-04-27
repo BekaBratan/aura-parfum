@@ -115,7 +115,7 @@ export default function StaffPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Сотрудники</h1>
         <p className="text-sm text-[var(--text-secondary)] mt-2">
-          Для добавления роли скопируйте user_id из Supabase Authentication Users.
+          Для добавления роли укажите user_id из Supabase Authentication Users.
         </p>
       </div>
 

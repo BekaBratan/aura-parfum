@@ -19,7 +19,7 @@ create table if not exists products (
   gender      text check (gender in ('men','women','unisex')) default 'unisex',
   volume_ml   integer,
   image_url   text,
-  in_stock    boolean default true,
+  count       integer not null default 0,
   is_featured boolean default false,
   created_at  timestamptz default now()
 );
@@ -176,12 +176,12 @@ create policy "orders_delete_admin" on orders
 -- ─────────────────────────────────────────
 -- SAMPLE PRODUCTS (optional seed data)
 -- ─────────────────────────────────────────
-insert into products (name, brand, description, price, gender, volume_ml, image_url, in_stock, is_featured) values
-  ('Bleu de Chanel', 'Chanel', 'Свежий древесно-ароматический аромат для мужчин. Нотки цитрусовых, ладана и сандала.', 85000, 'men', 100, 'https://images.unsplash.com/photo-1541643600914-78b084683702?w=600', true, true),
-  ('Miss Dior', 'Dior', 'Романтический цветочный аромат с нотками пиона, жасмина и мускуса.', 79000, 'women', 50, 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=600', true, true),
-  ('Black Opium', 'YSL', 'Чувственный аромат с нотками кофе, ванили и белых цветов.', 72000, 'women', 90, 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=600', true, false),
-  ('Sauvage', 'Dior', 'Дикий и свежий аромат с нотками бергамота, перца и амброксана.', 89000, 'men', 100, 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=600', true, true),
-  ('Coco Mademoiselle', 'Chanel', 'Изящный восточно-цветочный аромат с нотками апельсина, розы и пачули.', 91000, 'women', 100, 'https://images.unsplash.com/photo-1619994403073-2cec844b8e63?w=600', true, false),
-  ('Aventus', 'Creed', 'Легендарный фруктово-шипровый аромат для сильных мужчин.', 195000, 'men', 50, 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=600', true, true),
-  ('La Vie est Belle', 'Lancôme', 'Сладкий цветочный аромат с нотками ириса, жасмина и пралине.', 68000, 'women', 75, 'https://images.unsplash.com/photo-1541643600914-78b084683702?w=600', true, false),
-  ('Acqua di Gio', 'Giorgio Armani', 'Освежающий морской аромат с нотками бергамота, моря и кедра.', 65000, 'men', 100, 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=600', false, false);
+insert into products (name, brand, description, price, gender, volume_ml, image_url, count, is_featured) values
+  ('Bleu de Chanel', 'Chanel', 'Свежий древесно-ароматический аромат для мужчин. Нотки цитрусовых, ладана и сандала.', 85000, 'men', 100, 'https://images.unsplash.com/photo-1541643600914-78b084683702?w=600', 5, true),
+  ('Miss Dior', 'Dior', 'Романтический цветочный аромат с нотками пиона, жасмина и мускуса.', 79000, 'women', 50, 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=600', 5, true),
+  ('Black Opium', 'YSL', 'Чувственный аромат с нотками кофе, ванили и белых цветов.', 72000, 'women', 90, 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=600', 5, false),
+  ('Sauvage', 'Dior', 'Дикий и свежий аромат с нотками бергамота, перца и амброксана.', 89000, 'men', 100, 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=600', 5, true),
+  ('Coco Mademoiselle', 'Chanel', 'Изящный восточно-цветочный аромат с нотками апельсина, розы и пачули.', 91000, 'women', 100, 'https://images.unsplash.com/photo-1619994403073-2cec844b8e63?w=600', 5, false),
+  ('Aventus', 'Creed', 'Легендарный фруктово-шипровый аромат для сильных мужчин.', 195000, 'men', 50, 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=600', 5, true),
+  ('La Vie est Belle', 'Lancôme', 'Сладкий цветочный аромат с нотками ириса, жасмина и пралине.', 68000, 'women', 75, 'https://images.unsplash.com/photo-1541643600914-78b084683702?w=600', 5, false),
+  ('Acqua di Gio', 'Giorgio Armani', 'Освежающий морской аромат с нотками бергамота, моря и кедра.', 65000, 'men', 100, 'https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=600', 0, false);

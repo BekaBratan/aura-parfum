@@ -14,6 +14,10 @@ export default function CartPage() {
   const totalPrice = useCartStore((s) => s.totalPrice);
   const clearCart = useCartStore((s) => s.clearCart);
   const [mounted, setMounted] = useState(false);
+  const hasInvalidStock = items.some((item) => {
+    const availableCount = Number(item.count ?? 0);
+    return availableCount <= 0 || item.quantity > availableCount;
+  });
 
   useEffect(() => {
     setMounted(true);
@@ -77,86 +81,91 @@ export default function CartPage() {
         </div>
 
         <div className="space-y-4 mb-8">
-          {items.map((item) => (
-            <div
-              key={item.product_id}
-              className="glass-card p-4 flex gap-4 items-center animate-fade-in-up"
-            >
-              {/* Image */}
-              <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-[var(--dark-3)] flex-shrink-0">
-                {item.image_url ? (
-                  <Image
-                    src={item.image_url}
-                    alt={item.name}
-                    fill
-                    className="object-cover"
-                    sizes="96px"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-[var(--text-secondary)]">
-                    <ShoppingBag size={24} />
-                  </div>
-                )}
-              </div>
+          {items.map((item) => {
+            const availableCount = Number(item.count ?? 0);
+            const isAvailable = availableCount > 0;
+            const canIncrement = isAvailable && item.quantity < availableCount;
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-[var(--gold)]">
-                  {item.brand}
-                </p>
-                <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">
-                  {item.name}
-                </h3>
-                {item.volume_ml && (
-                  <p className="text-[11px] text-[var(--text-secondary)]">
-                    {item.volume_ml} мл
+            return (
+              <div
+                key={item.product_id}
+                className="glass-card p-4 flex gap-4 items-center animate-fade-in-up"
+              >
+                <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-[var(--dark-3)] flex-shrink-0">
+                  {item.image_url ? (
+                    <Image
+                      src={item.image_url}
+                      alt={item.name}
+                      fill
+                      className="object-cover"
+                      sizes="96px"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-[var(--text-secondary)]">
+                      <ShoppingBag size={24} />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-[var(--gold)]">
+                    {item.brand}
                   </p>
-                )}
-                <p className="text-sm font-semibold text-[var(--gold)] mt-1">
-                  {formatPrice(item.price)}
-                </p>
-              </div>
+                  <h3 className="text-sm font-medium text-[var(--text-primary)] truncate">
+                    {item.name}
+                  </h3>
+                  {item.volume_ml && (
+                    <p className="text-[11px] text-[var(--text-secondary)]">
+                      {item.volume_ml} мл
+                    </p>
+                  )}
+                  <p className="text-sm font-semibold text-[var(--gold)] mt-1">
+                    {formatPrice(item.price)}
+                  </p>
+                  <p className={`text-[11px] mt-1 ${isAvailable ? "text-green-400" : "text-red-400"}`}>
+                    {isAvailable ? `В наличии: ${availableCount} шт.` : "Нет в наличии"}
+                  </p>
+                </div>
 
-              {/* Quantity */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() =>
-                    updateQuantity(item.product_id, item.quantity - 1)
-                  }
-                  className="w-8 h-8 rounded-full bg-[var(--dark-3)] border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:border-[var(--gold)] hover:text-[var(--gold)] transition-colors cursor-pointer"
-                >
-                  <Minus size={14} />
-                </button>
-                <span className="w-8 text-center text-sm font-medium text-[var(--text-primary)]">
-                  {item.quantity}
-                </span>
-                <button
-                  onClick={() =>
-                    updateQuantity(item.product_id, item.quantity + 1)
-                  }
-                  className="w-8 h-8 rounded-full bg-[var(--dark-3)] border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:border-[var(--gold)] hover:text-[var(--gold)] transition-colors cursor-pointer"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() =>
+                      updateQuantity(item.product_id, item.quantity - 1)
+                    }
+                    className="w-8 h-8 rounded-full bg-[var(--dark-3)] border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:border-[var(--gold)] hover:text-[var(--gold)] transition-colors cursor-pointer"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="w-8 text-center text-sm font-medium text-[var(--text-primary)]">
+                    {item.quantity}
+                  </span>
+                  <button
+                    onClick={() =>
+                      updateQuantity(item.product_id, item.quantity + 1)
+                    }
+                    disabled={!canIncrement}
+                    className="w-8 h-8 rounded-full bg-[var(--dark-3)] border border-[var(--border)] flex items-center justify-center text-[var(--text-secondary)] hover:border-[var(--gold)] hover:text-[var(--gold)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:border-[var(--border)] disabled:hover:text-[var(--text-secondary)]"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
 
-              {/* Subtotal + remove */}
-              <div className="text-right flex-shrink-0 hidden sm:block">
-                <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {formatPrice(item.price * item.quantity)}
-                </p>
-                <button
-                  onClick={() => removeItem(item.product_id)}
-                  className="text-xs text-red-400 hover:text-red-300 mt-1 cursor-pointer"
-                >
-                  Удалить
-                </button>
+                <div className="text-right flex-shrink-0 hidden sm:block">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {formatPrice(item.price * item.quantity)}
+                  </p>
+                  <button
+                    onClick={() => removeItem(item.product_id)}
+                    className="text-xs text-red-400 hover:text-red-300 mt-1 cursor-pointer"
+                  >
+                    Удалить
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {/* Total */}
         <div className="glass-card p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="text-lg text-[var(--text-secondary)]">Итого</span>
@@ -165,13 +174,23 @@ export default function CartPage() {
             </span>
           </div>
 
-          <Link
-            href="/checkout"
-            className="btn-gold w-full py-3.5 rounded-full text-sm font-semibold tracking-wide flex items-center justify-center gap-2"
-          >
-            <span>Оформить заказ</span>
-            <ArrowRight size={16} className="relative z-10" />
-          </Link>
+          {hasInvalidStock ? (
+            <button
+              type="button"
+              disabled
+              className="w-full py-3.5 rounded-full text-sm font-semibold tracking-wide flex items-center justify-center gap-2 bg-[var(--dark-4)] text-[var(--text-secondary)] cursor-not-allowed"
+            >
+              Нет в наличии
+            </button>
+          ) : (
+            <Link
+              href="/checkout"
+              className="btn-gold w-full py-3.5 rounded-full text-sm font-semibold tracking-wide flex items-center justify-center gap-2"
+            >
+              <span>Оформить заказ</span>
+              <ArrowRight size={16} className="relative z-10" />
+            </Link>
+          )}
         </div>
       </div>
     </div>

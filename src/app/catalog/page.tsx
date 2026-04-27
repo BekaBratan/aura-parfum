@@ -103,7 +103,7 @@ export default function CatalogPage() {
 
     // stock
     if (filters.inStockOnly) {
-      list = list.filter((p) => p.in_stock);
+      list = list.filter((p) => Number(p.count ?? 0) > 0);
     }
 
     // sort

@@ -7,7 +7,7 @@ export interface Product {
   gender: "men" | "women" | "unisex";
   volume_ml: number | null;
   image_url: string | null;
-  in_stock: boolean;
+  count: number;
   is_featured: boolean;
   created_at: string;
 }
@@ -39,6 +39,7 @@ export interface Order {
 
 export interface CartItem extends OrderItem {
   quantity: number;
+  count: number;
 }
 
 export interface FilterState {

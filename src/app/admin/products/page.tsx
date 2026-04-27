@@ -17,7 +17,7 @@ interface FormState {
   gender: "men" | "women" | "unisex";
   volume_ml: number;
   image_url: string;
-  in_stock: boolean;
+  count: number;
   is_featured: boolean;
 }
 
@@ -29,7 +29,7 @@ const emptyProduct: FormState = {
   gender: "unisex",
   volume_ml: 100,
   image_url: "",
-  in_stock: true,
+  count: 0,
   is_featured: false,
 };
 
@@ -73,7 +73,7 @@ export default function AdminProducts() {
       gender: product.gender,
       volume_ml: product.volume_ml || 100,
       image_url: product.image_url || "",
-      in_stock: product.in_stock,
+      count: Number(product.count ?? 0),
       is_featured: product.is_featured,
     });
     setModalOpen(true);
@@ -86,6 +86,7 @@ export default function AdminProducts() {
       return;
     }
 
+    const count = Math.max(0, Math.floor(Number(form.count) || 0));
     setSaving(true);
     const payload = {
       name: form.name,
@@ -95,7 +96,7 @@ export default function AdminProducts() {
       gender: form.gender,
       volume_ml: form.volume_ml ? Number(form.volume_ml) : null,
       image_url: form.image_url || null,
-      in_stock: form.in_stock,
+      count,
       is_featured: form.is_featured,
     };
 
@@ -140,9 +141,15 @@ export default function AdminProducts() {
     const { name, value, type } = e.target;
     if (type === "checkbox") {
       setForm((current) => ({ ...current, [name]: (e.target as HTMLInputElement).checked }));
-    } else {
-      setForm((current) => ({ ...current, [name]: value }));
+      return;
     }
+
+    if (["price", "volume_ml", "count"].includes(name)) {
+      setForm((current) => ({ ...current, [name]: Number(value) }));
+      return;
+    }
+
+    setForm((current) => ({ ...current, [name]: value }));
   };
 
   return (
@@ -175,35 +182,40 @@ export default function AdminProducts() {
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => (
-                <tr key={product.id} className="border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors">
-                  <td className="py-3 pr-4">
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--dark-3)] relative">
-                      {product.image_url ? <Image src={product.image_url} alt="" fill className="object-cover" sizes="40px" /> : null}
-                    </div>
-                  </td>
-                  <td className="py-3 pr-4 text-[var(--text-primary)]">{product.name}</td>
-                  <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{product.brand}</td>
-                  <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">{formatPrice(product.price)}</td>
-                  <td className="py-3 pr-4 hidden md:table-cell">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${product.in_stock ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
-                      {product.in_stock ? "Есть" : "Нет"}
-                    </span>
-                  </td>
-                  {isAdmin && (
-                    <td className="py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => openEdit(product)} className="p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors cursor-pointer">
-                          <Pencil size={15} />
-                        </button>
-                        <button onClick={() => handleDelete(product.id)} className="p-2 text-[var(--text-secondary)] hover:text-red-400 transition-colors cursor-pointer">
-                          <Trash2 size={15} />
-                        </button>
+              {products.map((product) => {
+                const productCount = Number(product.count ?? 0);
+                const isAvailable = productCount > 0;
+
+                return (
+                  <tr key={product.id} className="border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors">
+                    <td className="py-3 pr-4">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--dark-3)] relative">
+                        {product.image_url ? <Image src={product.image_url} alt="" fill className="object-cover" sizes="40px" /> : null}
                       </div>
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="py-3 pr-4 text-[var(--text-primary)]">{product.name}</td>
+                    <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{product.brand}</td>
+                    <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">{formatPrice(product.price)}</td>
+                    <td className="py-3 pr-4 hidden md:table-cell">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                        {isAvailable ? `В наличии: ${productCount} шт.` : "Нет в наличии"}
+                      </span>
+                    </td>
+                    {isAdmin && (
+                      <td className="py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => openEdit(product)} className="p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors cursor-pointer">
+                            <Pencil size={15} />
+                          </button>
+                          <button onClick={() => handleDelete(product.id)} className="p-2 text-[var(--text-secondary)] hover:text-red-400 transition-colors cursor-pointer">
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -232,10 +244,8 @@ export default function AdminProducts() {
                 <option value="unisex">Унисекс</option>
               </select>
               <input name="image_url" value={form.image_url} onChange={handleChange} placeholder="URL изображения" className="input-dark" />
+              <input name="count" type="number" min="0" step="1" value={form.count} onChange={handleChange} placeholder="Количество" className="input-dark" />
               <div className="flex gap-6">
-                <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer">
-                  <input type="checkbox" name="in_stock" checked={form.in_stock} onChange={handleChange} className="accent-[var(--gold)] w-4 h-4" /> В наличии
-                </label>
                 <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer">
                   <input type="checkbox" name="is_featured" checked={form.is_featured} onChange={handleChange} className="accent-[var(--gold)] w-4 h-4" /> Хит продаж
                 </label>

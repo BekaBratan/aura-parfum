@@ -13,7 +13,7 @@ async function getFeaturedProducts(): Promise<Product[]> {
       .from("products")
       .select("*")
       .eq("is_featured", true)
-      .eq("in_stock", true)
+      .gt("count", 0)
       .limit(4);
     return (data as Product[]) || [];
   } catch {
@@ -44,19 +44,14 @@ export default async function HomePage() {
   return (
     <>
       {/* ── HERO ── */}
-      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
+      <section className="relative min-h-[470px] lg:min-h-[500px] 2xl:min-h-[600px] flex items-center justify-center overflow-hidden pt-[72px]">
         {/* Background layers */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#0d0d0d] via-[#1a1510] to-[#0d0d0d]" />
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[var(--gold)]/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-1/3 right-1/4 w-80 h-80 bg-[var(--gold)]/5 rounded-full blur-3xl animate-pulse delay-1000" />
-        </div>
-
         {/* Decorative lines */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-32 bg-gradient-to-b from-transparent to-[var(--gold)]/30" />
+        <div className="absolute top-[72px] left-1/2 -translate-x-1/2 w-px h-16 bg-gradient-to-b from-transparent to-[var(--gold)]/30" />
 
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--border)] bg-white/5 mb-8 animate-fade-in-up">
+        <div className="relative z-10 text-center px-4 sm:px-6 lg:px-8 max-w-4xl mx-auto -mt-8 lg:-mt-10">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--border)] bg-white/5 mb-5 animate-fade-in-up">
             <Sparkles size={14} className="text-[var(--gold)]" />
             <span className="text-xs tracking-widest uppercase text-[var(--text-secondary)]">
               Оригинальная парфюмерия
@@ -64,7 +59,7 @@ export default async function HomePage() {
           </div>
 
           <h1
-            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold mb-6 leading-[1.1] animate-fade-in-up"
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-[60px] font-bold mb-4 leading-[1.08] animate-fade-in-up"
             style={{ animationDelay: "0.1s", fontFamily: "'Playfair Display', serif" }}
           >
             <span className="text-gold-gradient">Аромат</span>
@@ -73,7 +68,7 @@ export default async function HomePage() {
           </h1>
 
           <p
-            className="text-base sm:text-lg text-[var(--text-secondary)] max-w-xl mx-auto mb-10 leading-relaxed animate-fade-in-up"
+            className="text-base sm:text-lg text-[var(--text-secondary)] max-w-xl mx-auto mb-6 leading-relaxed animate-fade-in-up"
             style={{ animationDelay: "0.2s" }}
           >
             Откройте коллекцию изысканных ароматов от ведущих мировых брендов.
@@ -95,12 +90,12 @@ export default async function HomePage() {
         </div>
 
         {/* Bottom fade */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--dark)] to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[var(--dark)] to-transparent" />
       </section>
 
       {/* ── ADVANTAGES ── */}
-      <section className="py-16 border-y border-[var(--border)]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="py-8 lg:py-10 border-y border-[var(--border)]">
+        <div className="page-container">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             {[
               { icon: ShieldCheck, title: "100% Оригинал", text: "Только подлинная парфюмерия от официальных дистрибьюторов" },
@@ -108,8 +103,10 @@ export default async function HomePage() {
               { icon: Sparkles, title: "Лучшие бренды", text: "Коллекция ароматов от мировых парфюмерных домов" },
             ].map((item) => (
               <div key={item.title} className="text-center group">
-                <div className="w-14 h-14 rounded-2xl bg-[var(--gold)]/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-[var(--gold)]/20 transition-colors duration-300">
-                  <item.icon size={24} className="text-[var(--gold)]" />
+                <div className="flex justify-center mb-3">
+                  <div className="w-12 h-12 rounded-2xl bg-[var(--gold)]/10 flex items-center justify-center group-hover:bg-[var(--gold)]/20 transition-colors duration-300">
+                    <item.icon size={22} className="text-[var(--gold)]" />
+                  </div>
                 </div>
                 <h3 className="text-base font-semibold mb-1 text-[var(--text-primary)]">
                   {item.title}
@@ -125,8 +122,8 @@ export default async function HomePage() {
 
       {/* ── FEATURED ── */}
       {featured.length > 0 && (
-        <section className="py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="home-section">
+          <div className="page-container">
             <div className="flex items-end justify-between mb-10">
               <div>
                 <p className="text-xs uppercase tracking-widest text-[var(--gold)] mb-2">
@@ -144,7 +141,7 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {featured.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
@@ -155,8 +152,8 @@ export default async function HomePage() {
 
       {/* ── NEWEST ── */}
       {newest.length > 0 && (
-        <section className="py-20 bg-[var(--dark-2)]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <section className="home-section bg-[var(--dark-2)]">
+          <div className="page-container">
             <div className="flex items-end justify-between mb-10">
               <div>
                 <p className="text-xs uppercase tracking-widest text-[var(--gold)] mb-2">
@@ -174,7 +171,7 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {newest.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
@@ -184,8 +181,9 @@ export default async function HomePage() {
       )}
 
       {/* ── CTA ── */}
-      <section className="py-24">
-        <div className="max-w-3xl mx-auto text-center px-4">
+      <section className="py-16 sm:py-20">
+        <div className="page-container">
+          <div className="cta-inner">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4 text-[var(--text-primary)]">
             Найдите <span className="text-gold-gradient">свой</span> аромат
           </h2>
@@ -199,6 +197,7 @@ export default async function HomePage() {
             <span>Смотреть каталог</span>
             <ArrowRight size={16} className="relative z-10" />
           </Link>
+          </div>
         </div>
       </section>
     </>

@@ -17,7 +17,7 @@ export default function AdminDashboard() {
         supabase.from("orders").select("total_price"),
       ]);
       const orders = ordRes.data || [];
-      const revenue = orders.reduce((s, o) => s + Number(o.total_price), 0);
+      const revenue = orders.reduce((sum, order) => sum + Number(order.total_price), 0);
       setStats({
         products: prodRes.count || 0,
         orders: orders.length,
@@ -36,20 +36,20 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Дашборд</h1>
+      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Панель</h1>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {cards.map((c) => (
-          <div key={c.label} className="glass-card p-5">
+        {cards.map((card) => (
+          <div key={card.label} className="glass-card p-5">
             <div className="flex items-center gap-3 mb-3">
-              <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${c.color}`}>
-                <c.icon size={20} />
+              <div className={`w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center ${card.color}`}>
+                <card.icon size={20} />
               </div>
-              <span className="text-sm text-[var(--text-secondary)]">{c.label}</span>
+              <span className="text-sm text-[var(--text-secondary)]">{card.label}</span>
             </div>
             {loading ? (
               <div className="h-7 skeleton w-24" />
             ) : (
-              <p className="text-2xl font-bold text-[var(--text-primary)]">{c.value}</p>
+              <p className="text-2xl font-bold text-[var(--text-primary)]">{card.value}</p>
             )}
           </div>
         ))}
