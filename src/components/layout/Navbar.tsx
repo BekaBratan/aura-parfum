@@ -46,7 +46,7 @@ export default function Navbar() {
               AZ-ZAHRA
             </span>
             <span className="text-xs sm:text-sm font-light tracking-[0.3em] text-[var(--text-secondary)] uppercase mt-1">
-              Parfum
+              Parfume
             </span>
           </Link>
 
