@@ -1,34 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { ArrowLeft, Loader2, Send, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/utils";
-import { useCartStore } from "@/store/cartStore";
+import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
+import { CartItem } from "@/types";
 
-type ProductStockRow = {
-  id: string;
-  name: string;
-  count: number | null;
+type StockIssue = {
+  item: CartItem;
+  availableCount: number;
 };
 
-type AggregatedCartItem = {
-  product_id: string;
-  name: string;
-  price: number;
-  quantity: number;
-};
+function getFirstStockIssue(items: CartItem[]): StockIssue | null {
+  for (const item of items) {
+    const quantity = Number(item.quantity);
+    const availableCount = Number(item.count ?? 0);
+
+    if (Number.isNaN(quantity) || quantity <= 0 || availableCount <= 0 || quantity > availableCount) {
+      return { item, availableCount };
+    }
+  }
+
+  return null;
+}
+
+function getStockIssueMessage(issue: StockIssue) {
+  if (issue.availableCount <= 0) {
+    return `Товар закончился: ${issue.item.name}. Удалите его из корзины.`;
+  }
+
+  return `Недостаточно товара в наличии: ${issue.item.name}. В корзине: ${issue.item.quantity}, доступно: ${issue.availableCount} шт.`;
+}
 
 export default function CheckoutPage() {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
   const totalPrice = useCartStore((s) => s.totalPrice);
   const clearCart = useCartStore((s) => s.clearCart);
+  const syncItemsWithProducts = useCartStore((s) => s.syncItemsWithProducts);
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshingStock, setRefreshingStock] = useState(false);
   const [form, setForm] = useState({
     customer_name: "",
     customer_phone: "",
@@ -36,11 +52,53 @@ export default function CheckoutPage() {
     customer_address: "",
     comment: "",
   });
+  const productIdsKey = useMemo(
+    () => [...new Set(items.map((item) => item.product_id))].sort().join(","),
+    [items]
+  );
+  const stockIssue = useMemo(() => getFirstStockIssue(items), [items]);
+
+  const refreshCartProducts = useCallback(async ({ showToast = false } = {}) => {
+    const currentItems = useCartStore.getState().items;
+    const productIds = [...new Set(currentItems.map((item) => item.product_id))];
+    if (productIds.length === 0) return currentItems;
+
+    setRefreshingStock(true);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, brand, price, volume_ml, image_url, count")
+        .in("id", productIds);
+
+      if (error || !data) {
+        toast.error("Не удалось обновить остатки товаров");
+        return currentItems;
+      }
+
+      syncItemsWithProducts(data as CartProductSnapshot[]);
+
+      if (showToast) {
+        toast.success("Остатки обновлены");
+      }
+
+      return useCartStore.getState().items;
+    } finally {
+      setRefreshingStock(false);
+    }
+  }, [syncItemsWithProducts]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => setMounted(true));
     return () => cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    if (!mounted || !productIdsKey) return;
+
+    void refreshCartProducts();
+  }, [mounted, productIdsKey, refreshCartProducts]);
 
   if (!mounted) return null;
 
@@ -68,82 +126,24 @@ export default function CheckoutPage() {
     e.preventDefault();
 
     if (!form.customer_name || !form.customer_phone || !form.customer_city || !form.customer_address) {
-      toast.error("Please fill in all required fields");
+      toast.error("Заполните обязательные поля");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const supabase = createClient();
-      const aggregatedItems = Array.from(
-        items.reduce((acc, item) => {
-          const productId = item.product_id;
-          const existing = acc.get(productId);
-          const requestedQuantity = Number(item.quantity);
+      const refreshedItems = await refreshCartProducts();
+      const currentItems = refreshedItems ?? useCartStore.getState().items;
+      const currentStockIssue = getFirstStockIssue(currentItems);
 
-          if (existing) {
-            existing.quantity += requestedQuantity;
-          } else {
-            acc.set(productId, {
-              product_id: productId,
-              name: item.name,
-              price: Number(item.price),
-              quantity: requestedQuantity,
-            });
-          }
-
-          return acc;
-        }, new Map<string, AggregatedCartItem>()).values()
-      );
-      const productIds = aggregatedItems.map((item) => item.product_id);
-      const { data: stockRows, error: stockError } = await supabase
-        .from("products")
-        .select("id, name, count")
-        .in("id", productIds);
-
-      if (stockError || !stockRows) {
-        toast.error("Не удалось проверить наличие товаров");
+      if (currentStockIssue) {
+        toast.error(getStockIssueMessage(currentStockIssue));
         setSubmitting(false);
         return;
       }
 
-      const stockById = new Map(
-        (stockRows as ProductStockRow[]).map((product) => [product.id, product])
-      );
-
-      for (const item of aggregatedItems) {
-        const product = stockById.get(item.product_id);
-        const productName = product?.name || item.name;
-        const requestedQuantity = Number(item.quantity);
-        const availableCount = Number(product?.count ?? 0);
-
-        if (process.env.NODE_ENV === "development") {
-          console.debug("Checkout stock validation", {
-            productId: item.product_id,
-            productName,
-            requestedQuantity,
-            availableCount,
-            unitPrice: item.price,
-          });
-        }
-
-        if (Number.isNaN(requestedQuantity) || requestedQuantity <= 0) {
-          toast.error(`Некорректное количество товара: ${productName}`);
-          setSubmitting(false);
-          return;
-        }
-
-        if (!product || requestedQuantity > availableCount) {
-          toast.error(
-            `Недостаточно товара в наличии: ${productName}. Доступно: ${availableCount} шт.`
-          );
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      const orderItems = items.map((item) => ({
+      const orderItems = currentItems.map((item) => ({
         product_id: item.product_id,
         name: item.name,
         brand: item.brand,
@@ -152,52 +152,37 @@ export default function CheckoutPage() {
         volume_ml: item.volume_ml,
         image_url: item.image_url,
       }));
-      const orderTotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("create_order_with_stock_check", {
+        p_customer_name: form.customer_name,
+        p_customer_phone: form.customer_phone,
+        p_customer_city: form.customer_city,
+        p_customer_address: form.customer_address,
+        p_comment: form.comment || null,
+        p_items: orderItems,
+      });
 
-      for (const item of aggregatedItems) {
-        const { error: decrementError } = await supabase.rpc(
-          "decrement_product_count",
-          {
-            p_product_id: item.product_id,
-            p_quantity: item.quantity,
-          }
-        );
-
-        if (decrementError) {
-          console.error(decrementError);
-          toast.error(`Не удалось обновить остатки товара: ${item.name}. Попробуйте еще раз.`);
-          setSubmitting(false);
-          return;
-        }
+      if (error) {
+        console.error(error);
+        await refreshCartProducts();
+        toast.error(error.message || "Не удалось создать заказ");
+        setSubmitting(false);
+        return;
       }
 
-      const { data, error } = await supabase
-        .from("orders")
-        .insert({
-          customer_name: form.customer_name,
-          customer_phone: form.customer_phone,
-          customer_city: form.customer_city,
-          customer_address: form.customer_address,
-          comment: form.comment || null,
-          items: orderItems,
-          total_price: orderTotal,
-          payment_status: "pending_payment",
-          order_status: "new",
-        })
-        .select("id")
-        .single();
+      const createdOrder = Array.isArray(data) ? data[0] : data;
 
-      if (error || !data) {
-        toast.error("Could not save order");
+      if (!createdOrder?.order_id) {
+        toast.error("Не удалось создать заказ");
         setSubmitting(false);
         return;
       }
 
       clearCart();
-      toast.success("Order created");
-      router.push(`/invoice/${data.id}`);
+      toast.success("Заказ создан");
+      router.push(`/invoice/${createdOrder.order_id}`);
     } catch {
-      toast.error("Something went wrong");
+      toast.error("Что-то пошло не так");
       setSubmitting(false);
     }
   };
@@ -250,9 +235,23 @@ export default function CheckoutPage() {
               />
             </label>
 
-            <button type="submit" disabled={submitting} className="btn btn-primary">
+            {stockIssue && (
+              <p className="product-availability is-empty">{getStockIssueMessage(stockIssue)}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting || refreshingStock || Boolean(stockIssue)}
+              className="btn btn-primary"
+            >
               {submitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-              {submitting ? "Создаем заказ..." : "Создать счет"}
+              {stockIssue
+                ? "Проверьте корзину перед оформлением"
+                : refreshingStock
+                  ? "Обновляем остатки..."
+                  : submitting
+                    ? "Создаем заказ..."
+                    : "Создать счет"}
             </button>
           </form>
 

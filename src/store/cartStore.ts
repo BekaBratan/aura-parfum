@@ -2,11 +2,22 @@ import { CartItem } from "@/types";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+export type CartProductSnapshot = {
+  id: string;
+  name: string;
+  brand: string;
+  price: number;
+  volume_ml: number | null;
+  image_url: string | null;
+  count: number | null;
+};
+
 interface CartStore {
   items: CartItem[];
   addItem: (item: Omit<CartItem, "quantity">) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
+  syncItemsWithProducts: (products: CartProductSnapshot[]) => void;
   clearCart: () => void;
   totalItems: () => number;
   totalPrice: () => number;
@@ -50,6 +61,29 @@ export const useCartStore = create<CartStore>()(
               ? { ...i, quantity: Math.min(quantity, Number(i.count ?? 0)) }
               : i
           ),
+        });
+      },
+
+      syncItemsWithProducts: (products) => {
+        const productsById = new Map(products.map((product) => [product.id, product]));
+
+        set({
+          items: get().items.map((item) => {
+            const product = productsById.get(item.product_id);
+            if (!product) return item;
+
+            const availableCount = Number(product.count ?? 0);
+
+            return {
+              ...item,
+              name: product.name,
+              brand: product.brand,
+              price: Number(product.price),
+              volume_ml: product.volume_ml,
+              image_url: product.image_url,
+              count: availableCount,
+            };
+          }),
         });
       },
 
