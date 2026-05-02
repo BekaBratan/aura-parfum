@@ -36,7 +36,7 @@ export default function AuthPage() {
 
         <form onSubmit={handleLogin} className="checkout-form">
           <label className="form-field">
-            <span className="form-label">Email</span>
+            <span className="form-label">Телефон или Email</span>
             <input
               type="email"
               value={email}
