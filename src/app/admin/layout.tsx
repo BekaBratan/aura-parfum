@@ -82,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[var(--dark-2)] border-r border-[var(--border)] flex flex-col transition-transform duration-300 ${sideOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
           <div className="p-6 flex items-center justify-between">
-            <Link href="/admin" className="text-xl font-bold text-gold-gradient" style={{ fontFamily: "'Playfair Display', serif" }}>AURA Admin</Link>
+            <Link href="/admin" className="text-xl font-bold text-gold-gradient" style={{ fontFamily: "'Playfair Display', serif" }}>AZ-ZAHRA Admin</Link>
             <button onClick={() => setSideOpen(false)} className="lg:hidden text-[var(--text-secondary)] cursor-pointer"><X size={20} /></button>
           </div>
           <nav className="flex-1 px-4 space-y-1">
