@@ -15,6 +15,13 @@ type ProductStockRow = {
   count: number | null;
 };
 
+type AggregatedCartItem = {
+  product_id: string;
+  name: string;
+  price: number;
+  quantity: number;
+};
+
 export default function CheckoutPage() {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
@@ -69,7 +76,27 @@ export default function CheckoutPage() {
 
     try {
       const supabase = createClient();
-      const productIds = items.map((item) => item.product_id);
+      const aggregatedItems = Array.from(
+        items.reduce((acc, item) => {
+          const productId = item.product_id;
+          const existing = acc.get(productId);
+          const requestedQuantity = Number(item.quantity);
+
+          if (existing) {
+            existing.quantity += requestedQuantity;
+          } else {
+            acc.set(productId, {
+              product_id: productId,
+              name: item.name,
+              price: Number(item.price),
+              quantity: requestedQuantity,
+            });
+          }
+
+          return acc;
+        }, new Map<string, AggregatedCartItem>()).values()
+      );
+      const productIds = aggregatedItems.map((item) => item.product_id);
       const { data: stockRows, error: stockError } = await supabase
         .from("products")
         .select("id, name, count")
@@ -85,13 +112,31 @@ export default function CheckoutPage() {
         (stockRows as ProductStockRow[]).map((product) => [product.id, product])
       );
 
-      for (const item of items) {
+      for (const item of aggregatedItems) {
         const product = stockById.get(item.product_id);
+        const productName = product?.name || item.name;
+        const requestedQuantity = Number(item.quantity);
         const availableCount = Number(product?.count ?? 0);
 
-        if (!product || item.quantity > availableCount) {
+        if (process.env.NODE_ENV === "development") {
+          console.debug("Checkout stock validation", {
+            productId: item.product_id,
+            productName,
+            requestedQuantity,
+            availableCount,
+            unitPrice: item.price,
+          });
+        }
+
+        if (Number.isNaN(requestedQuantity) || requestedQuantity <= 0) {
+          toast.error(`Некорректное количество товара: ${productName}`);
+          setSubmitting(false);
+          return;
+        }
+
+        if (!product || requestedQuantity > availableCount) {
           toast.error(
-            `Недостаточно товара в наличии: ${item.name}. Доступно: ${availableCount} шт.`
+            `Недостаточно товара в наличии: ${productName}. Доступно: ${availableCount} шт.`
           );
           setSubmitting(false);
           return;
@@ -102,11 +147,29 @@ export default function CheckoutPage() {
         product_id: item.product_id,
         name: item.name,
         brand: item.brand,
-        price: item.price,
-        quantity: item.quantity,
+        price: Number(item.price),
+        quantity: Number(item.quantity),
         volume_ml: item.volume_ml,
         image_url: item.image_url,
       }));
+      const orderTotal = orderItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+      for (const item of aggregatedItems) {
+        const { error: decrementError } = await supabase.rpc(
+          "decrement_product_count",
+          {
+            p_product_id: item.product_id,
+            p_quantity: item.quantity,
+          }
+        );
+
+        if (decrementError) {
+          console.error(decrementError);
+          toast.error(`Не удалось обновить остатки товара: ${item.name}. Попробуйте еще раз.`);
+          setSubmitting(false);
+          return;
+        }
+      }
 
       const { data, error } = await supabase
         .from("orders")
@@ -117,7 +180,7 @@ export default function CheckoutPage() {
           customer_address: form.customer_address,
           comment: form.comment || null,
           items: orderItems,
-          total_price: totalPrice(),
+          total_price: orderTotal,
           payment_status: "pending_payment",
           order_status: "new",
         })
@@ -128,26 +191,6 @@ export default function CheckoutPage() {
         toast.error("Could not save order");
         setSubmitting(false);
         return;
-      }
-
-      for (const item of items) {
-        const { error: decrementError } = await supabase.rpc(
-          "decrement_product_count",
-          {
-            p_product_id: item.product_id,
-            p_quantity: item.quantity,
-          }
-        );
-
-        if (decrementError) {
-          const product = stockById.get(item.product_id);
-          const availableCount = Number(product?.count ?? 0);
-          toast.error(
-            `Недостаточно товара в наличии: ${item.name}. Доступно: ${availableCount} шт.`
-          );
-          setSubmitting(false);
-          return;
-        }
       }
 
       clearCart();

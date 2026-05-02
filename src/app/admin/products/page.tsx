@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { Loader2, Pencil, Plus, Save, Trash2, X } from "lucide-react";
+import { ImageIcon, Loader2, Pencil, Plus, Save, Trash2, Upload, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAdminRole } from "@/lib/adminRole";
 import { createClient } from "@/lib/supabase/client";
@@ -13,11 +13,11 @@ interface FormState {
   name: string;
   brand: string;
   description: string;
-  price: number;
+  price: string;
   gender: "men" | "women" | "unisex";
-  volume_ml: number;
+  volume_ml: string;
   image_url: string;
-  count: number;
+  count: string;
   is_featured: boolean;
 }
 
@@ -25,13 +25,111 @@ const emptyProduct: FormState = {
   name: "",
   brand: "",
   description: "",
-  price: 0,
+  price: "",
   gender: "unisex",
-  volume_ml: 100,
+  volume_ml: "",
   image_url: "",
-  count: 0,
+  count: "",
   is_featured: false,
 };
+
+const PRODUCT_IMAGE_BUCKET = "product-images";
+const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const ALLOWED_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+const MIME_TYPE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+function generatedUploadId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return Math.random().toString(36).slice(2);
+}
+
+function getImageExtension(file: File) {
+  const fileExtension = file.name.split(".").pop()?.toLowerCase();
+
+  if (fileExtension && ALLOWED_IMAGE_EXTENSIONS.has(fileExtension)) {
+    return fileExtension;
+  }
+
+  return MIME_TYPE_EXTENSIONS[file.type] || null;
+}
+
+function validateImageFile(file: File) {
+  const extension = getImageExtension(file);
+
+  if (!extension || (file.type && !ALLOWED_IMAGE_MIME_TYPES.has(file.type))) {
+    return "Можно загружать только JPG, JPEG, PNG или WEBP";
+  }
+
+  if (file.size > MAX_IMAGE_SIZE_BYTES) {
+    return "Размер изображения не должен превышать 5 МБ";
+  }
+
+  return null;
+}
+
+function slugifyUploadName(value: string) {
+  const slug = value
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+
+  return slug || generatedUploadId();
+}
+
+function createUploadPath(file: File, form: FormState, productId: string | null) {
+  const extension = getImageExtension(file) || "jpg";
+  const baseName = productId || slugifyUploadName(`${form.brand}-${form.name}`);
+
+  return `products/${baseName}-${Date.now()}.${extension}`;
+}
+
+function normalizeNumericInput(value: string, allowZero: boolean): string {
+  const digits = value.replace(/\D/g, "");
+  if (digits === "") return "";
+
+  const normalized = digits.replace(/^0+(?=\d)/, "");
+  if (!allowZero && normalized === "0") return "";
+
+  return normalized;
+}
+
+function ProductThumbnail({ product }: { product: Product }) {
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [product.image_url]);
+
+  return (
+    <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--dark-3)] relative">
+      {product.image_url && !imageError ? (
+        <Image
+          src={product.image_url}
+          alt=""
+          fill
+          className="object-cover"
+          sizes="40px"
+          onError={() => setImageError(true)}
+        />
+      ) : (
+        <div className="absolute inset-0 grid place-items-center text-[var(--gold-dark)]">
+          <ImageIcon size={16} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminProducts() {
   const { role } = useAdminRole();
@@ -42,8 +140,27 @@ export default function AdminProducts() {
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyProduct);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState<string | null>(null);
+  const [previewImageError, setPreviewImageError] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const supabase = createClient();
+  const imagePreviewSrc = selectedImagePreviewUrl || form.image_url.trim();
+
+  const resetSelectedImage = () => {
+    setSelectedImageFile(null);
+    setSelectedImagePreviewUrl(null);
+    setPreviewImageError(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const closeModal = () => {
+    resetSelectedImage();
+    setModalOpen(false);
+  };
 
   async function loadProducts() {
     const { data } = await supabase.from("products").select("*").order("created_at", { ascending: false });
@@ -55,10 +172,23 @@ export default function AdminProducts() {
     loadProducts();
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (selectedImagePreviewUrl) {
+        URL.revokeObjectURL(selectedImagePreviewUrl);
+      }
+    };
+  }, [selectedImagePreviewUrl]);
+
+  useEffect(() => {
+    setPreviewImageError(false);
+  }, [selectedImagePreviewUrl, form.image_url]);
+
   const openNew = () => {
     if (!isAdmin) return;
     setEditId(null);
     setForm(emptyProduct);
+    resetSelectedImage();
     setModalOpen(true);
   };
 
@@ -69,58 +199,127 @@ export default function AdminProducts() {
       name: product.name,
       brand: product.brand,
       description: product.description || "",
-      price: product.price,
+      price: String(product.price ?? ""),
       gender: product.gender,
-      volume_ml: product.volume_ml || 100,
+      volume_ml: product.volume_ml === null ? "" : String(product.volume_ml),
       image_url: product.image_url || "",
-      count: Number(product.count ?? 0),
+      count: String(product.count ?? 0),
       is_featured: product.is_featured,
     });
+    resetSelectedImage();
     setModalOpen(true);
+  };
+
+  const uploadSelectedImage = async () => {
+    if (!selectedImageFile) return null;
+
+    const imagePath = createUploadPath(selectedImageFile, form, editId);
+    const { error } = await supabase.storage
+      .from(PRODUCT_IMAGE_BUCKET)
+      .upload(imagePath, selectedImageFile, {
+        cacheControl: "3600",
+        contentType: selectedImageFile.type || undefined,
+        upsert: false,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(imagePath);
+
+    return {
+      path: imagePath,
+      publicUrl: data.publicUrl,
+    };
   };
 
   const handleSave = async () => {
     if (!isAdmin) return;
-    if (!form.name || !form.brand || !form.price) {
-      toast.error("Заполните название, бренд и цену");
+
+    if (!form.name || !form.brand) {
+      toast.error("Заполните название и бренд");
       return;
     }
 
-    const count = Math.max(0, Math.floor(Number(form.count) || 0));
-    setSaving(true);
-    const payload = {
-      name: form.name,
-      brand: form.brand,
-      description: form.description || null,
-      price: Number(form.price),
-      gender: form.gender,
-      volume_ml: form.volume_ml ? Number(form.volume_ml) : null,
-      image_url: form.image_url || null,
-      count,
-      is_featured: form.is_featured,
-    };
-
-    if (editId) {
-      const { error } = await supabase.from("products").update(payload).eq("id", editId);
-      if (error) {
-        toast.error("Ошибка обновления");
-        setSaving(false);
-        return;
-      }
-      toast.success("Товар обновлен");
-    } else {
-      const { error } = await supabase.from("products").insert(payload);
-      if (error) {
-        toast.error("Ошибка создания");
-        setSaving(false);
-        return;
-      }
-      toast.success("Товар добавлен");
+    if (form.price === "") {
+      toast.error("Укажите цену товара");
+      return;
     }
 
-    setSaving(false);
-    setModalOpen(false);
-    loadProducts();
+    const price = Number(form.price);
+    if (price <= 0) {
+      toast.error("Цена должна быть больше 0");
+      return;
+    }
+
+    if (form.count === "") {
+      toast.error("Укажите количество товара");
+      return;
+    }
+
+    const count = Math.floor(Number(form.count));
+    if (count < 0) {
+      toast.error("Количество не может быть отрицательным");
+      return;
+    }
+
+    const volumeMl = form.volume_ml === "" ? null : Number(form.volume_ml);
+    if (volumeMl !== null && volumeMl <= 0) {
+      toast.error("Объем должен быть больше 0");
+      return;
+    }
+
+    setSaving(true);
+
+    let uploadedPath: string | null = null;
+
+    try {
+      const uploadedImage = await uploadSelectedImage();
+      uploadedPath = uploadedImage?.path || null;
+      const imageUrl = uploadedImage?.publicUrl || form.image_url || null;
+
+      const payload = {
+        name: form.name,
+        brand: form.brand,
+        description: form.description || null,
+        price,
+        gender: form.gender,
+        volume_ml: volumeMl,
+        image_url: imageUrl,
+        count,
+        is_featured: form.is_featured,
+      };
+
+      let saveError: string | null = null;
+
+      if (editId) {
+        const { error } = await supabase.from("products").update(payload).eq("id", editId);
+        saveError = error?.message || null;
+      } else {
+        const { error } = await supabase.from("products").insert(payload);
+        saveError = error?.message || null;
+      }
+
+      if (saveError) {
+        if (uploadedPath) {
+          await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([uploadedPath]);
+        }
+
+        toast.error(editId ? "Ошибка обновления" : "Ошибка создания");
+        return;
+      }
+
+      toast.success(editId ? "Товар обновлен" : "Товар добавлен");
+      resetSelectedImage();
+      setModalOpen(false);
+      loadProducts();
+    } catch (error) {
+      console.error(error);
+      toast.error("Не удалось загрузить изображение. Товар не сохранен.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -145,11 +344,32 @@ export default function AdminProducts() {
     }
 
     if (["price", "volume_ml", "count"].includes(name)) {
-      setForm((current) => ({ ...current, [name]: Number(value) }));
+      setForm((current) => ({ ...current, [name]: normalizeNumericInput(value, name === "count") }));
       return;
     }
 
     setForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+
+    if (!file) {
+      resetSelectedImage();
+      return;
+    }
+
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      toast.error(validationError);
+      resetSelectedImage();
+      e.target.value = "";
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setSelectedImagePreviewUrl(URL.createObjectURL(file));
+    setPreviewImageError(false);
   };
 
   return (
@@ -189,9 +409,7 @@ export default function AdminProducts() {
                 return (
                   <tr key={product.id} className="border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors">
                     <td className="py-3 pr-4">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--dark-3)] relative">
-                        {product.image_url ? <Image src={product.image_url} alt="" fill className="object-cover" sizes="40px" /> : null}
-                      </div>
+                      <ProductThumbnail product={product} />
                     </td>
                     <td className="py-3 pr-4 text-[var(--text-primary)]">{product.name}</td>
                     <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{product.brand}</td>
@@ -223,37 +441,185 @@ export default function AdminProducts() {
 
       {modalOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="glass-card w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 bg-[var(--dark-2)]">
-            <div className="flex items-center justify-between mb-5">
+          <div className="glass-card modal-form w-full max-w-xl p-6 bg-[var(--dark-2)]">
+            <div className="modal-form-header">
               <h2 className="text-lg font-bold text-[var(--text-primary)]">{editId ? "Редактировать" : "Новый товар"}</h2>
-              <button onClick={() => setModalOpen(false)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
+                aria-label="Закрыть форму товара"
+              >
                 <X size={20} />
               </button>
             </div>
-            <div className="space-y-3">
-              <input name="name" value={form.name} onChange={handleChange} placeholder="Название" className="input-dark" />
-              <input name="brand" value={form.brand} onChange={handleChange} placeholder="Бренд" className="input-dark" />
-              <textarea name="description" value={form.description} onChange={handleChange} placeholder="Описание" rows={3} className="input-dark resize-none" />
-              <div className="grid grid-cols-2 gap-3">
-                <input name="price" type="number" value={form.price} onChange={handleChange} placeholder="Цена (₸)" className="input-dark" />
-                <input name="volume_ml" type="number" value={form.volume_ml} onChange={handleChange} placeholder="Объем (мл)" className="input-dark" />
+            <div className="modal-form-body">
+              <div className="form-group">
+                <label htmlFor="product-name" className="form-label">Название товара</label>
+                <input
+                  id="product-name"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  placeholder="Например: Coco Mademoiselle"
+                  className="input-dark"
+                />
               </div>
-              <select name="gender" value={form.gender} onChange={handleChange} className="input-dark">
-                <option value="men">Мужской</option>
-                <option value="women">Женский</option>
-                <option value="unisex">Унисекс</option>
-              </select>
-              <input name="image_url" value={form.image_url} onChange={handleChange} placeholder="URL изображения" className="input-dark" />
-              <input name="count" type="number" min="0" step="1" value={form.count} onChange={handleChange} placeholder="Количество" className="input-dark" />
-              <div className="flex gap-6">
-                <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer">
-                  <input type="checkbox" name="is_featured" checked={form.is_featured} onChange={handleChange} className="accent-[var(--gold)] w-4 h-4" /> Хит продаж
+
+              <div className="form-group">
+                <label htmlFor="product-brand" className="form-label">Бренд</label>
+                <input
+                  id="product-brand"
+                  name="brand"
+                  value={form.brand}
+                  onChange={handleChange}
+                  placeholder="Например: Chanel"
+                  className="input-dark"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="product-description" className="form-label">Описание</label>
+                <textarea
+                  id="product-description"
+                  name="description"
+                  value={form.description}
+                  onChange={handleChange}
+                  placeholder="Краткое описание аромата"
+                  rows={3}
+                  className="input-dark resize-none"
+                />
+              </div>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="product-price" className="form-label">Цена, ₸</label>
+                  <input
+                    id="product-price"
+                    name="price"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={form.price}
+                    onChange={handleChange}
+                    placeholder="Например: 91000"
+                    aria-describedby="product-price-help"
+                    className="input-dark"
+                  />
+                  <p id="product-price-help" className="form-help">Укажите цену в тенге без символа ₸</p>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="product-volume" className="form-label">Объем, мл</label>
+                  <input
+                    id="product-volume"
+                    name="volume_ml"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={form.volume_ml}
+                    onChange={handleChange}
+                    placeholder="Например: 100"
+                    className="input-dark"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="product-count" className="form-label">Количество, шт.</label>
+                  <input
+                    id="product-count"
+                    name="count"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={form.count}
+                    onChange={handleChange}
+                    placeholder="Например: 12"
+                    aria-describedby="product-count-help"
+                    className="input-dark"
+                  />
+                  <p id="product-count-help" className="form-help">Если товара нет, поставьте 0</p>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="product-gender" className="form-label">Пол / категория</label>
+                  <select
+                    id="product-gender"
+                    name="gender"
+                    value={form.gender}
+                    onChange={handleChange}
+                    className="input-dark"
+                  >
+                    <option value="men">Мужской</option>
+                    <option value="women">Женский</option>
+                    <option value="unisex">Унисекс</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="product-image-file" className="form-label">Изображение товара</label>
+                <p id="product-image-help" className="form-help">JPG, PNG или WebP до 5MB</p>
+                <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--dark-3)]">
+                  {imagePreviewSrc && !previewImageError ? (
+                    <img
+                      src={imagePreviewSrc}
+                      alt=""
+                      className="h-full w-full object-cover"
+                      onError={() => setPreviewImageError(true)}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 grid place-items-center text-center text-[var(--gold-dark)]">
+                      <div>
+                        <ImageIcon size={42} strokeWidth={1.2} className="mx-auto" />
+                        <span className="mt-2 block text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">Aura Parfum</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedImageFile && (
+                    <button
+                      type="button"
+                      onClick={resetSelectedImage}
+                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[var(--text-primary)] shadow-sm transition-colors hover:text-red-500"
+                      aria-label="Убрать выбранное изображение"
+                      title="Убрать выбранное изображение"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+                <label htmlFor="product-image-file" className="input-dark flex cursor-pointer items-center gap-2 text-sm">
+                  <Upload size={16} className="shrink-0 text-[var(--gold-dark)]" />
+                  <span className="truncate">{selectedImageFile ? selectedImageFile.name : "Загрузить изображение"}</span>
+                  <input
+                    id="product-image-file"
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                    onChange={handleImageFileChange}
+                    disabled={saving}
+                    aria-describedby="product-image-help"
+                    className="sr-only"
+                  />
                 </label>
               </div>
+
+              <div className="form-group form-group-inline">
+                <input
+                  id="product-featured"
+                  type="checkbox"
+                  name="is_featured"
+                  checked={form.is_featured}
+                  onChange={handleChange}
+                  className="accent-[var(--gold)] w-4 h-4"
+                />
+                <label htmlFor="product-featured" className="form-label cursor-pointer">Хит продаж</label>
+              </div>
             </div>
-            <div className="flex gap-3 mt-6">
-              <button onClick={() => setModalOpen(false)} className="btn-outline-gold flex-1 py-2.5 rounded-lg text-sm cursor-pointer">Отмена</button>
-              <button onClick={handleSave} disabled={saving} className="btn-gold flex-1 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
+            <div className="modal-form-actions">
+              <button type="button" onClick={closeModal} className="btn-outline-gold flex-1 py-2.5 rounded-lg text-sm cursor-pointer">Отмена</button>
+              <button type="button" onClick={handleSave} disabled={saving} className="btn-gold flex-1 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
                 {saving ? <Loader2 size={16} className="animate-spin relative z-10" /> : <Save size={16} className="relative z-10" />}
                 <span>{saving ? "Сохранение..." : "Сохранить"}</span>
               </button>

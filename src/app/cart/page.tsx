@@ -14,10 +14,15 @@ export default function CartPage() {
   const totalPrice = useCartStore((s) => s.totalPrice);
   const clearCart = useCartStore((s) => s.clearCart);
   const [mounted, setMounted] = useState(false);
-  const hasInvalidStock = items.some((item) => {
-    const availableCount = Number(item.count ?? 0);
-    return availableCount <= 0 || item.quantity > availableCount;
-  });
+  const hasInvalidStock = Array.from(
+    items.reduce((acc, item) => {
+      const current = acc.get(item.product_id) || { quantity: 0, count: Number(item.count ?? 0) };
+      current.quantity += Number(item.quantity);
+      current.count = Number(item.count ?? current.count);
+      acc.set(item.product_id, current);
+      return acc;
+    }, new Map<string, { quantity: number; count: number }>()).values()
+  ).some((item) => item.count <= 0 || item.quantity > item.count);
 
   useEffect(() => {
     setMounted(true);
