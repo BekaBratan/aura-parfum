@@ -34,6 +34,7 @@ export default function AdminDashboard() {
     { label: "Выручка", value: formatPrice(stats.revenue), icon: DollarSign, color: "text-[var(--gold)]" },
   ];
 
+  
   return (
     <div>
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Панель</h1>

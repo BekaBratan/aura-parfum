@@ -27,7 +27,7 @@ export default function Navbar() {
     <header className="site-header">
       <div className="site-container">
         <div className="site-header-inner">
-          <Link href="/" className="site-logo" aria-label="Aura Parfum">
+          <Link href="/" className="site-logo" aria-label="AZ-ZAHRA Parfum">
             <span className="site-logo-mark">AZ-ZAHRA</span>
             <span className="site-logo-text">Parfume</span>
           </Link>

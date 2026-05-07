@@ -30,7 +30,7 @@ export default function AuthPage() {
     <div className="auth-layout">
       <div className="card auth-card">
         <div className="auth-title">
-          <h1>AURA</h1>
+          <h1>AZ-ZAHRA</h1>
           <p>Вход в панель управления</p>
         </div>
 

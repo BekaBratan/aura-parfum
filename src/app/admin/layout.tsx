@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AdminRoleProvider, StaffRole } from "@/lib/adminRole";
-import { LayoutDashboard, Package, ShoppingCart, LogOut, Menu, X, Users } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, LogOut, Menu, X, Users, HomeIcon } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -68,6 +68,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (!staffRole) return null;
 
   const links = [
+    { href: "/", label: "Главная", icon: HomeIcon },
     { href: "/admin", label: "Панель", icon: LayoutDashboard },
     { href: "/admin/products", label: "Товары", icon: Package },
     { href: "/admin/orders", label: "Заказы", icon: ShoppingCart },
@@ -82,7 +83,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[var(--dark-2)] border-r border-[var(--border)] flex flex-col transition-transform duration-300 ${sideOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
           <div className="p-6 flex items-center justify-between">
-            <Link href="/admin" className="text-xl font-bold text-gold-gradient" style={{ fontFamily: "'Playfair Display', serif" }}>AURA Admin</Link>
+            <Link href="/admin" className="text-xl font-bold text-gold-gradient" style={{ fontFamily: "'Playfair Display', serif" }}>AZ-ZAHRA Admin</Link>
             <button onClick={() => setSideOpen(false)} className="lg:hidden text-[var(--text-secondary)] cursor-pointer"><X size={20} /></button>
           </div>
           <nav className="flex-1 px-4 space-y-1">

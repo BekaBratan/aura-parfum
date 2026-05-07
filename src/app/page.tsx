@@ -147,7 +147,7 @@ export default async function HomePage() {
       <section className="section">
         <div className="site-container">
           <div className="cta-inner">
-            <p className="eyebrow">Aura Parfum</p>
+            <p className="eyebrow">AZ-ZAHRA Parfum</p>
             <h2 className="section-title">Найдите свой аромат</h2>
             <p className="section-subtitle">
               Выберите парфюм, который подчеркнет ваш стиль, сезон и настроение.
