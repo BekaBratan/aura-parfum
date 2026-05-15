@@ -6,19 +6,37 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatPricePerUnit, UNIT_LABELS } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { ShoppingBag, ArrowLeft, Check, X as XIcon } from "lucide-react";
 import toast from "react-hot-toast";
+
+const ATTRIBUTE_LABELS: Record<string, string> = {
+  gender: "Пол",
+  family: "Семейство",
+  oil_type: "Тип масла",
+  aroma_note: "Нота",
+  country: "Страна",
+  type: "Тип",
+  material: "Материал",
+  color: "Цвет",
+  top_notes: "Верхние ноты",
+  middle_notes: "Средние ноты",
+  base_notes: "Базовые ноты",
+};
 
 export default function ProductPage() {
   const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [chosenVolume, setChosenVolume] = useState<number>(1);
   const addItem = useCartStore((s) => s.addItem);
+
   const productCount = Number(product?.count ?? 0);
   const isAvailable = productCount > 0;
+  const isMl = product?.unit === "ml";
+  const minVolume = product?.min_volume ?? 1;
 
   useEffect(() => {
     async function load() {
@@ -34,22 +52,42 @@ export default function ProductPage() {
     load();
   }, [id]);
 
+  // Init volume input when product loads
+  useEffect(() => {
+    if (product) {
+      setChosenVolume(product.min_volume ?? 1);
+    }
+  }, [product?.id, product?.min_volume]);
+
   useEffect(() => {
     setImageError(false);
   }, [product?.image_url]);
 
+  const handleVolumeChange = (raw: string) => {
+    const val = parseInt(raw, 10);
+    if (isNaN(val)) return;
+    setChosenVolume(Math.min(Math.max(val, minVolume), productCount));
+  };
+
   const handleAdd = () => {
     if (!product || !isAvailable) return;
+    const qty = isMl ? chosenVolume : 1;
     addItem({
       product_id: product.id,
       name: product.name,
       brand: product.brand,
       price: product.price,
-      volume_ml: product.volume_ml,
+      volume_ml: isMl ? qty : product.volume_ml,
       image_url: product.image_url,
       count: productCount,
+      unit: product.unit ?? "pcs",
+      category: product.category ?? "accessory",
+      quantity: qty,
     });
-    toast.success(`${product.name} добавлен в корзину`);
+    const label = isMl
+      ? `${qty} мл → ${formatPrice(product.price * qty)}`
+      : product.name;
+    toast.success(`Добавлено: ${label}`);
   };
 
   if (loading) {
@@ -80,6 +118,16 @@ export default function ProductPage() {
     );
   }
 
+  const totalPrice = isMl ? product.price * chosenVolume : product.price;
+  const availabilityText = isAvailable
+    ? `В наличии: ${productCount} ${UNIT_LABELS[product.unit ?? "pcs"]}`
+    : "Нет в наличии";
+
+  // Filter out empty attributes for display
+  const attributeEntries = Object.entries(product.attributes ?? {}).filter(
+    ([, v]) => v !== "" && v !== null && v !== undefined
+  );
+
   return (
     <div className="product-detail">
       <div className="site-container">
@@ -89,6 +137,7 @@ export default function ProductPage() {
         </Link>
 
         <div className="product-detail-grid">
+          {/* Image */}
           <div className="product-detail-image">
             {product.image_url && !imageError ? (
               <Image
@@ -109,39 +158,72 @@ export default function ProductPage() {
               </div>
             )}
             {product.is_featured && (
-              <span className="badge badge-success product-detail-badge">Хит продаж</span>
+              <span className="badge badge-success product-detail-badge">
+                Хит продаж
+              </span>
             )}
           </div>
 
+          {/* Detail panel */}
           <div className="detail-panel">
             <div>
               <p className="product-brand">{product.brand}</p>
               <h1 className="detail-title">{product.name}</h1>
-              {product.volume_ml && <p className="product-meta">{product.volume_ml} мл</p>}
             </div>
 
-            <p className="price detail-price">{formatPrice(product.price)}</p>
+            {/* Price display */}
+            {isMl ? (
+              <div className="detail-price-block">
+                <p className="price detail-price">
+                  {formatPricePerUnit(product.price, "ml")}
+                </p>
+              </div>
+            ) : (
+              <p className="price detail-price">{formatPrice(product.price)}</p>
+            )}
+
+            {/* Volume selector for ml products */}
+            {isMl && (
+              <div className="volume-selector">
+                <label className="volume-selector-label">
+                  Объём, мл
+                  <span className="volume-selector-hint">
+                    доступно: {productCount} мл
+                  </span>
+                </label>
+                <div className="volume-selector-row">
+                  <input
+                    type="number"
+                    min={minVolume}
+                    max={productCount}
+                    step={1}
+                    value={chosenVolume}
+                    onChange={(e) => handleVolumeChange(e.target.value)}
+                    disabled={!isAvailable}
+                    className="input volume-input"
+                    aria-label="Объём в мл"
+                  />
+                  <span className="volume-unit">мл</span>
+                  {isAvailable && (
+                    <span className="volume-total">
+                      = {formatPrice(totalPrice)}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {product.description && (
               <p className="detail-description">{product.description}</p>
             )}
 
+            {/* Details card */}
             <div className="card detail-list">
-              <div className="detail-row">
-                <span>Пол</span>
-                <strong>
-                  {product.gender === "men"
-                    ? "Мужской"
-                    : product.gender === "women"
-                    ? "Женский"
-                    : "Унисекс"}
-                </strong>
-              </div>
               <div className="detail-row">
                 <span>Наличие</span>
                 {isAvailable ? (
                   <strong className="product-availability">
-                    <Check size={14} /> В наличии: {productCount} шт.
+                    <Check size={14} /> {availabilityText}
                   </strong>
                 ) : (
                   <strong className="product-availability is-empty">
@@ -149,15 +231,30 @@ export default function ProductPage() {
                   </strong>
                 )}
               </div>
+
+              {/* Render all product attributes */}
+              {attributeEntries.map(([key, value]) => (
+                <div key={key} className="detail-row">
+                  <span>{ATTRIBUTE_LABELS[key] ?? key}</span>
+                  <strong>
+                    {Array.isArray(value) ? value.join(", ") : String(value)}
+                  </strong>
+                </div>
+              ))}
             </div>
 
+            {/* Add to cart */}
             <button
               onClick={handleAdd}
-              disabled={!isAvailable}
+              disabled={!isAvailable || (isMl && (chosenVolume < minVolume || chosenVolume > productCount))}
               className={`btn ${isAvailable ? "btn-primary" : "btn-secondary"}`}
             >
               <ShoppingBag size={18} />
-              {isAvailable ? "Добавить в корзину" : "Нет в наличии"}
+              {!isAvailable
+                ? "Нет в наличии"
+                : isMl
+                ? `В корзину — ${chosenVolume} мл`
+                : "Добавить в корзину"}
             </button>
           </div>
         </div>

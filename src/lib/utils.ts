@@ -1,3 +1,5 @@
+import type { ProductCategory, ProductUnit } from "@/types";
+
 export function formatPrice(price: number): string {
   return new Intl.NumberFormat("ru-KZ", {
     style: "currency",
@@ -5,6 +7,23 @@ export function formatPrice(price: number): string {
     maximumFractionDigits: 0,
   }).format(price);
 }
+
+export function formatPricePerUnit(price: number, unit: ProductUnit): string {
+  return `${formatPrice(price)} / ${UNIT_LABELS[unit]}`;
+}
+
+export const CATEGORY_LABELS: Record<ProductCategory, string> = {
+  oil: "Масла",
+  perfume: "Парфюм",
+  accessory: "Аксессуары",
+};
+
+export const UNIT_LABELS: Record<ProductUnit, string> = {
+  ml: "мл",
+  pcs: "шт.",
+};
+
+export const CATEGORY_ORDER: ProductCategory[] = ["oil", "perfume", "accessory"];
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   pending_payment: "Ожидает оплаты",
@@ -29,6 +48,7 @@ export function buildWhatsAppMessage(
     quantity: number;
     price: number;
     volume_ml: number | null;
+    unit?: ProductUnit;
   }[],
   customer: {
     customer_name: string;
@@ -52,10 +72,10 @@ export function buildWhatsAppMessage(
     `Address: ${customer.customer_address}`,
     "",
     "*Items:*",
-    ...items.map(
-      (item) =>
-        `- ${item.brand} ${item.name}${item.volume_ml ? ` ${item.volume_ml}ml` : ""} x ${item.quantity} = ${formatPrice(item.price * item.quantity)}`
-    ),
+    ...items.map((item) => {
+      const unitLabel = item.unit === "pcs" ? "шт." : "мл";
+      return `- ${item.brand} ${item.name} ${item.quantity} ${unitLabel} = ${formatPrice(item.price * item.quantity)}`;
+    }),
     "",
     `*Total:* ${formatPrice(totalPrice)}`,
   ];

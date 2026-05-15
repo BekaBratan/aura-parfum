@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { ArrowLeft, Loader2, Send, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, UNIT_LABELS } from "@/lib/utils";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
 import { CartItem } from "@/types";
 
@@ -33,7 +33,8 @@ function getStockIssueMessage(issue: StockIssue) {
     return `Товар закончился: ${issue.item.name}. Удалите его из корзины.`;
   }
 
-  return `Недостаточно товара в наличии: ${issue.item.name}. В корзине: ${issue.item.quantity}, доступно: ${issue.availableCount} шт.`;
+  const unitLabel = UNIT_LABELS[issue.item.unit ?? "pcs"];
+  return `Недостаточно товара в наличии: ${issue.item.name}. В корзине: ${issue.item.quantity} ${unitLabel}, доступно: ${issue.availableCount} ${unitLabel}.`;
 }
 
 export default function CheckoutPage() {
@@ -69,7 +70,7 @@ export default function CheckoutPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, brand, price, volume_ml, image_url, count")
+        .select("id, name, brand, price, volume_ml, image_url, count, unit, category")
         .in("id", productIds);
 
       if (error || !data) {
@@ -258,14 +259,17 @@ export default function CheckoutPage() {
           <aside className="card order-summary">
             <h2 className="filter-title">Ваш заказ</h2>
             <div className="order-items">
-              {items.map((item) => (
-                <div key={item.product_id} className="order-item">
-                  <span>
-                    {item.brand} {item.name} {item.volume_ml ? `${item.volume_ml} мл` : ""} × {item.quantity}
-                  </span>
-                  <strong>{formatPrice(item.price * item.quantity)}</strong>
-                </div>
-              ))}
+              {items.map((item) => {
+                const unitLabel = UNIT_LABELS[item.unit ?? "pcs"];
+                return (
+                  <div key={item.product_id} className="order-item">
+                    <span>
+                      {item.brand} {item.name} — {item.quantity} {unitLabel}
+                    </span>
+                    <strong>{formatPrice(item.price * item.quantity)}</strong>
+                  </div>
+                );
+              })}
             </div>
             <div className="summary-row order-total-row">
               <span>Итого</span>

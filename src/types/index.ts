@@ -1,3 +1,6 @@
+export type ProductCategory = "oil" | "perfume" | "accessory";
+export type ProductUnit = "ml" | "pcs";
+
 export interface Product {
   id: string;
   name: string;
@@ -10,6 +13,10 @@ export interface Product {
   count: number;
   is_featured: boolean;
   created_at: string;
+  category: ProductCategory;
+  unit: ProductUnit;
+  attributes: Record<string, string | string[]>;
+  min_volume: number | null;
 }
 
 export interface OrderItem {
@@ -20,6 +27,8 @@ export interface OrderItem {
   quantity: number;
   volume_ml: number | null;
   image_url: string | null;
+  unit: ProductUnit;
+  category: ProductCategory;
 }
 
 export interface Order {
@@ -51,4 +60,6 @@ export interface FilterState {
   priceMax: number | null;
   inStockOnly: boolean;
   sortBy: "price_asc" | "price_desc" | "newest";
+  category: ProductCategory | null;
+  attributeFilters: Record<string, string[]>;
 }

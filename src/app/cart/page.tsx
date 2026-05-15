@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, UNIT_LABELS } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
@@ -20,6 +20,8 @@ function getCartStockWarnings(items: CartItem[]): CartStockWarning[] {
     const availableCount = Number(item.count ?? 0);
     const quantity = Number(item.quantity);
 
+    const unitLabel = UNIT_LABELS[item.unit ?? "pcs"];
+
     if (availableCount <= 0) {
       return [{ productId: item.product_id, message: `Товар закончился: ${item.name}` }];
     }
@@ -28,7 +30,7 @@ function getCartStockWarnings(items: CartItem[]): CartStockWarning[] {
       return [
         {
           productId: item.product_id,
-          message: `Недостаточно товара: ${item.name}. В корзине: ${quantity}, доступно: ${availableCount}.`,
+          message: `Недостаточно товара: ${item.name}. В корзине: ${quantity} ${unitLabel}, доступно: ${availableCount} ${unitLabel}.`,
         },
       ];
     }
@@ -69,7 +71,7 @@ export default function CartPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, brand, price, volume_ml, image_url, count")
+        .select("id, name, brand, price, volume_ml, image_url, count, unit, category")
         .in("id", productIds);
 
       setRefreshing(false);
@@ -208,9 +210,10 @@ export default function CartPage() {
                 <div>
                   <p className="product-brand">{item.brand}</p>
                   <h3 className="product-title">{item.name}</h3>
-                  {item.volume_ml && <p className="product-meta">{item.volume_ml} мл</p>}
                   <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
-                    {isAvailable ? `В наличии: ${availableCount} шт.` : "Нет в наличии"}
+                    {isAvailable
+                      ? `В наличии: ${availableCount} ${UNIT_LABELS[item.unit ?? "pcs"]}`
+                      : "Нет в наличии"}
                   </p>
                   {stockWarning && (
                     <p className="product-availability is-empty">{stockWarning}</p>
@@ -233,16 +236,19 @@ export default function CartPage() {
                   <button
                     onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
                     className="icon-button"
-                    aria-label="Уменьшить количество"
+                    aria-label="Уменьшить"
                   >
                     <Minus size={14} />
                   </button>
-                  <span className="quantity-value">{item.quantity}</span>
+                  <span className="quantity-value">
+                    {item.quantity}
+                    {item.unit === "ml" && <span className="quantity-unit"> мл</span>}
+                  </span>
                   <button
                     onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
                     disabled={!canIncrement}
                     className="icon-button"
-                    aria-label="Увеличить количество"
+                    aria-label="Увеличить"
                   >
                     <Plus size={14} />
                   </button>

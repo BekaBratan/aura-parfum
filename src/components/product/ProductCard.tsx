@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatPricePerUnit, UNIT_LABELS } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { Product } from "@/types";
 import toast from "react-hot-toast";
@@ -23,6 +23,8 @@ export default function ProductCard({
   const productCount = Number(product.count ?? 0);
   const isAvailable = productCount > 0;
   const isList = variant === "list";
+  const isMl = product.unit === "ml";
+
   const cardClassName = [
     "product-card",
     `product-card--${variant}`,
@@ -36,10 +38,10 @@ export default function ProductCard({
     setImageError(false);
   }, [product.image_url]);
 
-  const handleAdd = (e: React.MouseEvent) => {
+  const handleAddAccessory = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isAvailable) return;
+    if (!isAvailable || isMl) return;
     addItem({
       product_id: product.id,
       name: product.name,
@@ -48,9 +50,19 @@ export default function ProductCard({
       volume_ml: product.volume_ml,
       image_url: product.image_url,
       count: productCount,
+      unit: product.unit ?? "pcs",
+      category: product.category ?? "accessory",
     });
     toast.success(`${product.name} добавлен в корзину`);
   };
+
+  const availabilityText = isAvailable
+    ? `В наличии: ${productCount} ${UNIT_LABELS[product.unit ?? "pcs"]}`
+    : "Нет в наличии";
+
+  const priceDisplay = isMl
+    ? formatPricePerUnit(product.price, "ml")
+    : formatPrice(product.price);
 
   return (
     <Link
@@ -58,6 +70,7 @@ export default function ProductCard({
       className={`product-card-link product-card-link--${variant}`}
     >
       <article className={cardClassName}>
+        {/* Image block */}
         <div
           className={
             isList
@@ -89,12 +102,15 @@ export default function ProductCard({
 
           <div className="product-card-badges">
             {product.is_featured && <span className="badge">Хит</span>}
-            {!isAvailable && <span className="badge badge-danger">Нет в наличии</span>}
+            {!isAvailable && (
+              <span className="badge badge-danger">Нет в наличии</span>
+            )}
           </div>
 
-          {isAvailable && !isList && (
+          {/* Quick-add only for accessories in grid view */}
+          {isAvailable && !isList && !isMl && (
             <button
-              onClick={handleAdd}
+              onClick={handleAddAccessory}
               className="product-quick-add"
               aria-label="В корзину"
             >
@@ -103,6 +119,7 @@ export default function ProductCard({
           )}
         </div>
 
+        {/* Content */}
         {isList ? (
           <>
             <div className="product-list-content">
@@ -111,35 +128,44 @@ export default function ProductCard({
                 <h3 className="product-title">{product.name}</h3>
               </div>
               <div className="product-list-meta">
-                {product.volume_ml && <span>{product.volume_ml} мл</span>}
                 <span className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
-                  {isAvailable ? `В наличии: ${productCount} шт.` : "Нет в наличии"}
+                  {availabilityText}
                 </span>
               </div>
             </div>
 
             <div className="product-list-actions">
-              <p className="price">{formatPrice(product.price)}</p>
-              <button
-                type="button"
-                onClick={handleAdd}
-                disabled={!isAvailable}
-                className="btn btn-primary product-card-action-button"
-              >
-                <ShoppingBag size={16} />
-                {isAvailable ? "В корзину" : "Нет в наличии"}
-              </button>
+              <p className="price">{priceDisplay}</p>
+              {isMl ? (
+                <Link
+                  href={`/product/${product.id}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className={`btn btn-primary product-card-action-button ${!isAvailable ? "is-disabled" : ""}`}
+                  aria-disabled={!isAvailable}
+                >
+                  Выбрать объём
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleAddAccessory}
+                  disabled={!isAvailable}
+                  className="btn btn-primary product-card-action-button"
+                >
+                  <ShoppingBag size={16} />
+                  {isAvailable ? "В корзину" : "Нет в наличии"}
+                </button>
+              )}
             </div>
           </>
         ) : (
           <div className="product-card-body">
             <p className="product-brand">{product.brand}</p>
             <h3 className="product-title">{product.name}</h3>
-            <p className="product-meta">{product.volume_ml ? `${product.volume_ml} мл` : ""}</p>
             <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
-              {isAvailable ? `В наличии: ${productCount} шт.` : "Нет в наличии"}
+              {availabilityText}
             </p>
-            <p className="price">{formatPrice(product.price)}</p>
+            <p className="price">{priceDisplay}</p>
           </div>
         )}
       </article>

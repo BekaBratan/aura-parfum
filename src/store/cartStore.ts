@@ -1,4 +1,4 @@
-import { CartItem } from "@/types";
+import { CartItem, ProductUnit, ProductCategory } from "@/types";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -10,11 +10,13 @@ export type CartProductSnapshot = {
   volume_ml: number | null;
   image_url: string | null;
   count: number | null;
+  unit: ProductUnit;
+  category: ProductCategory;
 };
 
 interface CartStore {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "quantity">) => void;
+  addItem: (item: Omit<CartItem, "quantity"> & { quantity?: number }) => void;
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   syncItemsWithProducts: (products: CartProductSnapshot[]) => void;
@@ -32,8 +34,13 @@ export const useCartStore = create<CartStore>()(
         const availableCount = Number(item.count ?? 0);
         if (availableCount <= 0) return;
 
+        const initialQty = item.quantity ?? 1;
+        const safeQty = Math.min(Math.max(1, initialQty), availableCount);
+
         const existing = get().items.find((i) => i.product_id === item.product_id);
-        if (existing) {
+
+        if (existing && item.unit === "pcs") {
+          // Accessories: increment quantity in cart
           set({
             items: get().items.map((i) =>
               i.product_id === item.product_id
@@ -41,8 +48,17 @@ export const useCartStore = create<CartStore>()(
                 : i
             ),
           });
+        } else if (existing && item.unit === "ml") {
+          // ml products: replace with new chosen volume (each add is a fresh choice)
+          set({
+            items: get().items.map((i) =>
+              i.product_id === item.product_id
+                ? { ...item, quantity: safeQty, count: availableCount }
+                : i
+            ),
+          });
         } else {
-          set({ items: [...get().items, { ...item, quantity: 1 }] });
+          set({ items: [...get().items, { ...item, quantity: safeQty }] });
         }
       },
 
@@ -79,9 +95,11 @@ export const useCartStore = create<CartStore>()(
               name: product.name,
               brand: product.brand,
               price: Number(product.price),
-              volume_ml: product.volume_ml,
+              volume_ml: item.unit === "ml" ? item.quantity : product.volume_ml,
               image_url: product.image_url,
               count: availableCount,
+              unit: product.unit,
+              category: product.category,
             };
           }),
         });

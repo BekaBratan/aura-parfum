@@ -58,13 +58,18 @@ function getInvoicePdfPath(order: Order) {
 }
 
 function getProductLine(item: Order["items"][number]) {
-  return `${item.brand} ${item.name}${item.volume_ml ? ` ${item.volume_ml} мл` : ""}`;
+  return `${item.brand} ${item.name}`;
+}
+
+function getQtyLabel(item: Order["items"][number]) {
+  const unit = item.unit ?? (item.volume_ml ? "ml" : "pcs");
+  return unit === "ml" ? `${item.quantity} мл` : `${item.quantity} шт.`;
 }
 
 function buildInvoicePdfDefinition(order: Order): TDocumentDefinitions {
   const productRows: TableCell[][] = order.items.map((item) => [
     { text: getProductLine(item) },
-    { text: String(item.quantity), alignment: "center" },
+    { text: getQtyLabel(item), alignment: "center" },
     { text: formatKzt(item.price), alignment: "right" },
     { text: formatKzt(item.price * item.quantity), alignment: "right" },
   ]);
@@ -162,8 +167,9 @@ function downloadBlob(blob: Blob, fileName: string) {
 function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string) {
   const productLines = order.items.map((item, index) => {
     const product = getProductLine(item);
+    const qty = getQtyLabel(item);
     const lineTotal = item.price * item.quantity;
-    return `${index + 1}. ${product} - ${item.quantity} × ${formatKzt(item.price)} = ${formatKzt(lineTotal)}`;
+    return `${index + 1}. ${product} - ${qty} × ${formatKzt(item.price)} = ${formatKzt(lineTotal)}`;
   });
 
   return [
@@ -332,7 +338,7 @@ export default function InvoicePage() {
                   <div>
                     <p className="product-title">{item.brand} {item.name}</p>
                     <p className="product-meta">
-                      {item.volume_ml ? `${item.volume_ml} мл · ` : ""}{item.quantity} × {formatPrice(item.price)}
+                      {getQtyLabel(item)} × {formatPrice(item.price)}
                     </p>
                   </div>
                   <strong>{formatPrice(item.price * item.quantity)}</strong>

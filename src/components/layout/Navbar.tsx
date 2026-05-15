@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ShoppingBag, Search, Menu, X, User } from "lucide-react";
+import { ShoppingBag, Search, Menu, X } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
@@ -53,10 +53,6 @@ export default function Navbar() {
               )}
             </Link>
 
-            <Link href="/auth" className="icon-button hidden-mobile" aria-label="Аккаунт">
-              <User size={20} />
-            </Link>
-
             <button
               onClick={() => setMenuOpen((open) => !open)}
               className="icon-button md:hidden"
@@ -75,9 +71,6 @@ export default function Navbar() {
         </Link>
         <Link href="/catalog" className="site-nav-link">
           Каталог
-        </Link>
-        <Link href="/auth" className="site-nav-link">
-          Войти
         </Link>
       </div>
     </header>

@@ -6,19 +6,23 @@ import { ImageIcon, Loader2, Pencil, Plus, Save, Trash2, Upload, X } from "lucid
 import toast from "react-hot-toast";
 import { useAdminRole } from "@/lib/adminRole";
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice } from "@/lib/utils";
-import { Product } from "@/types";
+import { formatPrice, CATEGORY_LABELS, UNIT_LABELS } from "@/lib/utils";
+import { Product, ProductCategory } from "@/types";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface FormState {
   name: string;
   brand: string;
   description: string;
   price: string;
-  gender: "men" | "women" | "unisex";
+  category: ProductCategory;
   volume_ml: string;
+  min_volume: string;
   image_url: string;
   count: string;
   is_featured: boolean;
+  attributes: Record<string, string>;
 }
 
 const emptyProduct: FormState = {
@@ -26,12 +30,43 @@ const emptyProduct: FormState = {
   brand: "",
   description: "",
   price: "",
-  gender: "unisex",
+  category: "perfume",
   volume_ml: "",
+  min_volume: "",
   image_url: "",
   count: "",
   is_featured: false,
+  attributes: {},
 };
+
+// ─── Category-specific attribute field configs ─────────────────────────────
+
+type AttrField = { key: string; label: string; placeholder: string };
+
+const CATEGORY_ATTR_FIELDS: Record<ProductCategory, AttrField[]> = {
+  oil: [
+    { key: "oil_type",    label: "Тип масла",               placeholder: "базовое, эфирное, смесь..." },
+    { key: "aroma_note",  label: "Нота / аромат",            placeholder: "роза, жасмин, мята..." },
+    { key: "country",     label: "Страна происхождения",     placeholder: "Болгария, Марокко..." },
+  ],
+  perfume: [
+    { key: "gender",      label: "Пол",                      placeholder: "" },
+    { key: "family",      label: "Семейство аромата",        placeholder: "цветочный, восточный, древесный..." },
+  ],
+  accessory: [
+    { key: "type",        label: "Тип аксессуара",           placeholder: "флакон, воронка, браслет..." },
+    { key: "material",    label: "Материал",                 placeholder: "стекло, металл, силикон..." },
+    { key: "color",       label: "Цвет",                     placeholder: "прозрачный, золотой, чёрный..." },
+  ],
+};
+
+const GENDER_OPTIONS = [
+  { value: "unisex", label: "Унисекс" },
+  { value: "men",    label: "Мужской" },
+  { value: "women",  label: "Женский" },
+];
+
+// ─── Image helpers ─────────────────────────────────────────────────────────
 
 const PRODUCT_IMAGE_BUCKET = "product-images";
 const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -44,34 +79,22 @@ const MIME_TYPE_EXTENSIONS: Record<string, string> = {
 };
 
 function generatedUploadId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return Math.random().toString(36).slice(2);
+  return typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2);
 }
 
 function getImageExtension(file: File) {
-  const fileExtension = file.name.split(".").pop()?.toLowerCase();
-
-  if (fileExtension && ALLOWED_IMAGE_EXTENSIONS.has(fileExtension)) {
-    return fileExtension;
-  }
-
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext && ALLOWED_IMAGE_EXTENSIONS.has(ext)) return ext;
   return MIME_TYPE_EXTENSIONS[file.type] || null;
 }
 
 function validateImageFile(file: File) {
   const extension = getImageExtension(file);
-
-  if (!extension || (file.type && !ALLOWED_IMAGE_MIME_TYPES.has(file.type))) {
+  if (!extension || (file.type && !ALLOWED_IMAGE_MIME_TYPES.has(file.type)))
     return "Можно загружать только JPG, JPEG, PNG или WEBP";
-  }
-
-  if (file.size > MAX_IMAGE_SIZE_BYTES) {
-    return "Размер изображения не должен превышать 5 МБ";
-  }
-
+  if (file.size > MAX_IMAGE_SIZE_BYTES) return "Размер изображения не должен превышать 5 МБ";
   return null;
 }
 
@@ -79,49 +102,36 @@ function slugifyUploadName(value: string) {
   const slug = value
     .toLowerCase()
     .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
-
   return slug || generatedUploadId();
 }
 
 function createUploadPath(file: File, form: FormState, productId: string | null) {
   const extension = getImageExtension(file) || "jpg";
   const baseName = productId || slugifyUploadName(`${form.brand}-${form.name}`);
-
   return `products/${baseName}-${Date.now()}.${extension}`;
 }
 
 function normalizeNumericInput(value: string, allowZero: boolean): string {
   const digits = value.replace(/\D/g, "");
   if (digits === "") return "";
-
   const normalized = digits.replace(/^0+(?=\d)/, "");
   if (!allowZero && normalized === "0") return "";
-
   return normalized;
 }
 
+// ─── Thumbnail component ───────────────────────────────────────────────────
+
 function ProductThumbnail({ product }: { product: Product }) {
   const [imageError, setImageError] = useState(false);
-
-  useEffect(() => {
-    setImageError(false);
-  }, [product.image_url]);
-
+  useEffect(() => setImageError(false), [product.image_url]);
   return (
     <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--dark-3)] relative">
       {product.image_url && !imageError ? (
-        <Image
-          src={product.image_url}
-          alt=""
-          fill
-          className="object-cover"
-          sizes="40px"
-          onError={() => setImageError(true)}
-        />
+        <Image src={product.image_url} alt="" fill className="object-cover" sizes="40px" onError={() => setImageError(true)} />
       ) : (
         <div className="absolute inset-0 grid place-items-center text-[var(--gold-dark)]">
           <ImageIcon size={16} />
@@ -131,9 +141,12 @@ function ProductThumbnail({ product }: { product: Product }) {
   );
 }
 
+// ─── Main component ────────────────────────────────────────────────────────
+
 export default function AdminProducts() {
   const { role } = useAdminRole();
   const isAdmin = role === "admin";
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -147,14 +160,13 @@ export default function AdminProducts() {
 
   const supabase = createClient();
   const imagePreviewSrc = selectedImagePreviewUrl || form.image_url.trim();
+  const isMl = form.category !== "accessory";
 
   const resetSelectedImage = () => {
     setSelectedImageFile(null);
     setSelectedImagePreviewUrl(null);
     setPreviewImageError(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const closeModal = () => {
@@ -168,21 +180,13 @@ export default function AdminProducts() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    loadProducts();
-  }, []);
+  useEffect(() => { loadProducts(); }, []);
 
   useEffect(() => {
-    return () => {
-      if (selectedImagePreviewUrl) {
-        URL.revokeObjectURL(selectedImagePreviewUrl);
-      }
-    };
+    return () => { if (selectedImagePreviewUrl) URL.revokeObjectURL(selectedImagePreviewUrl); };
   }, [selectedImagePreviewUrl]);
 
-  useEffect(() => {
-    setPreviewImageError(false);
-  }, [selectedImagePreviewUrl, form.image_url]);
+  useEffect(() => setPreviewImageError(false), [selectedImagePreviewUrl, form.image_url]);
 
   const openNew = () => {
     if (!isAdmin) return;
@@ -200,11 +204,18 @@ export default function AdminProducts() {
       brand: product.brand,
       description: product.description || "",
       price: String(product.price ?? ""),
-      gender: product.gender,
+      category: product.category ?? "perfume",
       volume_ml: product.volume_ml === null ? "" : String(product.volume_ml),
+      min_volume: product.min_volume === null ? "" : String(product.min_volume),
       image_url: product.image_url || "",
       count: String(product.count ?? 0),
       is_featured: product.is_featured,
+      attributes: Object.fromEntries(
+        Object.entries(product.attributes ?? {}).map(([k, v]) => [
+          k,
+          Array.isArray(v) ? v.join(", ") : String(v ?? ""),
+        ])
+      ),
     });
     resetSelectedImage();
     setModalOpen(true);
@@ -212,66 +223,33 @@ export default function AdminProducts() {
 
   const uploadSelectedImage = async () => {
     if (!selectedImageFile) return null;
-
     const imagePath = createUploadPath(selectedImageFile, form, editId);
     const { error } = await supabase.storage
       .from(PRODUCT_IMAGE_BUCKET)
-      .upload(imagePath, selectedImageFile, {
-        cacheControl: "3600",
-        contentType: selectedImageFile.type || undefined,
-        upsert: false,
-      });
-
-    if (error) {
-      throw error;
-    }
-
+      .upload(imagePath, selectedImageFile, { cacheControl: "3600", contentType: selectedImageFile.type || undefined, upsert: false });
+    if (error) throw error;
     const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(imagePath);
-
-    return {
-      path: imagePath,
-      publicUrl: data.publicUrl,
-    };
+    return { path: imagePath, publicUrl: data.publicUrl };
   };
 
   const handleSave = async () => {
     if (!isAdmin) return;
 
-    if (!form.name || !form.brand) {
-      toast.error("Заполните название и бренд");
-      return;
-    }
-
-    if (form.price === "") {
-      toast.error("Укажите цену товара");
-      return;
-    }
-
+    if (!form.name || !form.brand) { toast.error("Заполните название и бренд"); return; }
+    if (form.price === "") { toast.error("Укажите цену товара"); return; }
     const price = Number(form.price);
-    if (price <= 0) {
-      toast.error("Цена должна быть больше 0");
-      return;
-    }
-
-    if (form.count === "") {
-      toast.error("Укажите количество товара");
-      return;
-    }
-
+    if (price <= 0) { toast.error("Цена должна быть больше 0"); return; }
+    if (form.count === "") { toast.error("Укажите количество товара"); return; }
     const count = Math.floor(Number(form.count));
-    if (count < 0) {
-      toast.error("Количество не может быть отрицательным");
-      return;
-    }
+    if (count < 0) { toast.error("Количество не может быть отрицательным"); return; }
 
     const volumeMl = form.volume_ml === "" ? null : Number(form.volume_ml);
-    if (volumeMl !== null && volumeMl <= 0) {
-      toast.error("Объем должен быть больше 0");
-      return;
-    }
+    if (volumeMl !== null && volumeMl <= 0) { toast.error("Объем должен быть больше 0"); return; }
+
+    const minVolume = form.min_volume === "" ? null : Number(form.min_volume);
+    if (minVolume !== null && minVolume <= 0) { toast.error("Минимальный объём должен быть больше 0"); return; }
 
     setSaving(true);
-
     let uploadedPath: string | null = null;
 
     try {
@@ -279,20 +257,37 @@ export default function AdminProducts() {
       uploadedPath = uploadedImage?.path || null;
       const imageUrl = uploadedImage?.publicUrl || form.image_url || null;
 
+      const unit = form.category === "accessory" ? "pcs" : "ml";
+
+      // Build attributes object
+      const attrs: Record<string, string> = {};
+      for (const { key } of CATEGORY_ATTR_FIELDS[form.category]) {
+        const val = form.attributes[key]?.trim();
+        if (val) attrs[key] = val;
+      }
+
+      // Derive gender for DB column (for perfumes from attributes, else unisex)
+      const genderVal = form.category === "perfume"
+        ? ((form.attributes["gender"] ?? "unisex") as "men" | "women" | "unisex")
+        : "unisex";
+
       const payload = {
         name: form.name,
         brand: form.brand,
         description: form.description || null,
         price,
-        gender: form.gender,
+        gender: genderVal,
         volume_ml: volumeMl,
         image_url: imageUrl,
         count,
         is_featured: form.is_featured,
+        category: form.category,
+        unit,
+        min_volume: minVolume,
+        attributes: attrs,
       };
 
       let saveError: string | null = null;
-
       if (editId) {
         const { error } = await supabase.from("products").update(payload).eq("id", editId);
         saveError = error?.message || null;
@@ -302,10 +297,7 @@ export default function AdminProducts() {
       }
 
       if (saveError) {
-        if (uploadedPath) {
-          await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([uploadedPath]);
-        }
-
+        if (uploadedPath) await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([uploadedPath]);
         toast.error(editId ? "Ошибка обновления" : "Ошибка создания");
         return;
       }
@@ -325,13 +317,8 @@ export default function AdminProducts() {
   const handleDelete = async (id: string) => {
     if (!isAdmin) return;
     if (!confirm("Удалить этот товар?")) return;
-
     const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) {
-      toast.error("Ошибка удаления");
-      return;
-    }
-
+    if (error) { toast.error("Ошибка удаления"); return; }
     toast.success("Товар удален");
     loadProducts();
   };
@@ -339,38 +326,41 @@ export default function AdminProducts() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     if (type === "checkbox") {
-      setForm((current) => ({ ...current, [name]: (e.target as HTMLInputElement).checked }));
+      setForm((prev) => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
       return;
     }
-
-    if (["price", "volume_ml", "count"].includes(name)) {
-      setForm((current) => ({ ...current, [name]: normalizeNumericInput(value, name === "count") }));
+    if (["price", "volume_ml", "count", "min_volume"].includes(name)) {
+      setForm((prev) => ({ ...prev, [name]: normalizeNumericInput(value, name === "count") }));
       return;
     }
+    if (name === "category") {
+      // Reset category-specific attributes when switching category
+      setForm((prev) => ({ ...prev, category: value as ProductCategory, attributes: {} }));
+      return;
+    }
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
-    setForm((current) => ({ ...current, [name]: value }));
+  const handleAttrChange = (key: string, value: string) => {
+    setForm((prev) => ({ ...prev, attributes: { ...prev.attributes, [key]: value } }));
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-
-    if (!file) {
-      resetSelectedImage();
-      return;
-    }
-
+    if (!file) { resetSelectedImage(); return; }
     const validationError = validateImageFile(file);
-    if (validationError) {
-      toast.error(validationError);
-      resetSelectedImage();
-      e.target.value = "";
-      return;
-    }
-
+    if (validationError) { toast.error(validationError); resetSelectedImage(); e.target.value = ""; return; }
     setSelectedImageFile(file);
     setSelectedImagePreviewUrl(URL.createObjectURL(file));
     setPreviewImageError(false);
   };
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
+  const priceLabel = isMl ? "Цена, ₸/мл" : "Цена, ₸/шт.";
+  const countLabel = isMl ? "Запас, мл" : "Остаток, шт.";
+  const countHelp = isMl ? "Общий запас в мл" : "Если товара нет, поставьте 0";
+  const attrFields = CATEGORY_ATTR_FIELDS[form.category];
 
   return (
     <div>
@@ -396,6 +386,7 @@ export default function AdminProducts() {
                 <th className="pb-3 pr-4">Фото</th>
                 <th className="pb-3 pr-4">Название</th>
                 <th className="pb-3 pr-4 hidden sm:table-cell">Бренд</th>
+                <th className="pb-3 pr-4 hidden md:table-cell">Категория</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Цена</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Наличие</th>
                 {isAdmin && <th className="pb-3 text-right">Действия</th>}
@@ -405,29 +396,31 @@ export default function AdminProducts() {
               {products.map((product) => {
                 const productCount = Number(product.count ?? 0);
                 const isAvailable = productCount > 0;
-
+                const unit = product.unit ?? "pcs";
+                const cat = product.category ?? "perfume";
                 return (
                   <tr key={product.id} className="border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors">
-                    <td className="py-3 pr-4">
-                      <ProductThumbnail product={product} />
-                    </td>
+                    <td className="py-3 pr-4"><ProductThumbnail product={product} /></td>
                     <td className="py-3 pr-4 text-[var(--text-primary)]">{product.name}</td>
                     <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{product.brand}</td>
-                    <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">{formatPrice(product.price)}</td>
+                    <td className="py-3 pr-4 hidden md:table-cell">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)]">
+                        {CATEGORY_LABELS[cat]}
+                      </span>
+                    </td>
+                    <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">
+                      {formatPrice(product.price)}{unit === "ml" ? " /мл" : ""}
+                    </td>
                     <td className="py-3 pr-4 hidden md:table-cell">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
-                        {isAvailable ? `В наличии: ${productCount} шт.` : "Нет в наличии"}
+                        {isAvailable ? `${productCount} ${UNIT_LABELS[unit]}` : "Нет в наличии"}
                       </span>
                     </td>
                     {isAdmin && (
                       <td className="py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => openEdit(product)} className="p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors cursor-pointer">
-                            <Pencil size={15} />
-                          </button>
-                          <button onClick={() => handleDelete(product.id)} className="p-2 text-[var(--text-secondary)] hover:text-red-400 transition-colors cursor-pointer">
-                            <Trash2 size={15} />
-                          </button>
+                          <button onClick={() => openEdit(product)} className="p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors cursor-pointer"><Pencil size={15} /></button>
+                          <button onClick={() => handleDelete(product.id)} className="p-2 text-[var(--text-secondary)] hover:text-red-400 transition-colors cursor-pointer"><Trash2 size={15} /></button>
                         </div>
                       </td>
                     )}
@@ -441,133 +434,114 @@ export default function AdminProducts() {
 
       {modalOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="glass-card modal-form w-full max-w-xl p-6 bg-[var(--dark-2)]">
+          <div className="glass-card modal-form w-full max-w-xl p-6 bg-[var(--dark-2)] overflow-y-auto max-h-[90vh]">
             <div className="modal-form-header">
               <h2 className="text-lg font-bold text-[var(--text-primary)]">{editId ? "Редактировать" : "Новый товар"}</h2>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer"
-                aria-label="Закрыть форму товара"
-              >
+              <button type="button" onClick={closeModal} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer" aria-label="Закрыть">
                 <X size={20} />
               </button>
             </div>
+
             <div className="modal-form-body">
+              {/* Category selector */}
+              <div className="form-group">
+                <label htmlFor="product-category" className="form-label">Категория</label>
+                <select id="product-category" name="category" value={form.category} onChange={handleChange} className="input-dark">
+                  <option value="oil">Масло</option>
+                  <option value="perfume">Парфюм</option>
+                  <option value="accessory">Аксессуар</option>
+                </select>
+              </div>
+
+              {/* Name & Brand */}
               <div className="form-group">
                 <label htmlFor="product-name" className="form-label">Название товара</label>
-                <input
-                  id="product-name"
-                  name="name"
-                  value={form.name}
-                  onChange={handleChange}
-                  placeholder="Например: Coco Mademoiselle"
-                  className="input-dark"
-                />
+                <input id="product-name" name="name" value={form.name} onChange={handleChange} placeholder="Например: Coco Mademoiselle" className="input-dark" />
               </div>
 
               <div className="form-group">
                 <label htmlFor="product-brand" className="form-label">Бренд</label>
-                <input
-                  id="product-brand"
-                  name="brand"
-                  value={form.brand}
-                  onChange={handleChange}
-                  placeholder="Например: Chanel"
-                  className="input-dark"
-                />
+                <input id="product-brand" name="brand" value={form.brand} onChange={handleChange} placeholder="Например: Chanel" className="input-dark" />
               </div>
 
               <div className="form-group">
                 <label htmlFor="product-description" className="form-label">Описание</label>
-                <textarea
-                  id="product-description"
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  placeholder="Краткое описание аромата"
-                  rows={3}
-                  className="input-dark resize-none"
-                />
+                <textarea id="product-description" name="description" value={form.description} onChange={handleChange} placeholder="Краткое описание" rows={3} className="input-dark resize-none" />
               </div>
 
+              {/* Price, Count, Volume fields — labels change based on category */}
               <div className="form-grid">
                 <div className="form-group">
-                  <label htmlFor="product-price" className="form-label">Цена, ₸</label>
-                  <input
-                    id="product-price"
-                    name="price"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={form.price}
-                    onChange={handleChange}
-                    placeholder="Например: 91000"
-                    aria-describedby="product-price-help"
-                    className="input-dark"
-                  />
-                  <p id="product-price-help" className="form-help">Укажите цену в тенге без символа ₸</p>
+                  <label htmlFor="product-price" className="form-label">{priceLabel}</label>
+                  <input id="product-price" name="price" type="text" inputMode="numeric" pattern="[0-9]*" value={form.price} onChange={handleChange} placeholder={isMl ? "Например: 910" : "Например: 500"} className="input-dark" />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="product-volume" className="form-label">Объем, мл</label>
-                  <input
-                    id="product-volume"
-                    name="volume_ml"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={form.volume_ml}
-                    onChange={handleChange}
-                    placeholder="Например: 100"
-                    className="input-dark"
-                  />
+                  <label htmlFor="product-count" className="form-label">{countLabel}</label>
+                  <input id="product-count" name="count" type="text" inputMode="numeric" pattern="[0-9]*" value={form.count} onChange={handleChange} placeholder="Например: 500" className="input-dark" />
+                  <p className="form-help">{countHelp}</p>
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="product-count" className="form-label">Количество, шт.</label>
-                  <input
-                    id="product-count"
-                    name="count"
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={form.count}
-                    onChange={handleChange}
-                    placeholder="Например: 12"
-                    aria-describedby="product-count-help"
-                    className="input-dark"
-                  />
-                  <p id="product-count-help" className="form-help">Если товара нет, поставьте 0</p>
-                </div>
+                {/* Min volume — only for ml products */}
+                {isMl && (
+                  <div className="form-group">
+                    <label htmlFor="product-min-volume" className="form-label">Мин. объём, мл</label>
+                    <input id="product-min-volume" name="min_volume" type="text" inputMode="numeric" pattern="[0-9]*" value={form.min_volume} onChange={handleChange} placeholder="1" className="input-dark" />
+                    <p className="form-help">Минимальный заказ (по умолчанию 1 мл)</p>
+                  </div>
+                )}
 
-                <div className="form-group">
-                  <label htmlFor="product-gender" className="form-label">Пол / категория</label>
-                  <select
-                    id="product-gender"
-                    name="gender"
-                    value={form.gender}
-                    onChange={handleChange}
-                    className="input-dark"
-                  >
-                    <option value="men">Мужской</option>
-                    <option value="women">Женский</option>
-                    <option value="unisex">Унисекс</option>
-                  </select>
-                </div>
+                {/* Bottle volume — optional, ml products only */}
+                {isMl && (
+                  <div className="form-group">
+                    <label htmlFor="product-volume" className="form-label">Объём флакона, мл (необяз.)</label>
+                    <input id="product-volume" name="volume_ml" type="text" inputMode="numeric" pattern="[0-9]*" value={form.volume_ml} onChange={handleChange} placeholder="100" className="input-dark" />
+                  </div>
+                )}
               </div>
 
+              {/* Category-specific attributes */}
+              {attrFields.length > 0 && (
+                <div className="form-group">
+                  <p className="form-label" style={{ marginBottom: 8 }}>Характеристики</p>
+                  <div className="form-grid">
+                    {attrFields.map(({ key, label, placeholder }) => (
+                      <div key={key} className="form-group">
+                        <label htmlFor={`attr-${key}`} className="form-label">{label}</label>
+                        {key === "gender" ? (
+                          <select
+                            id={`attr-${key}`}
+                            value={form.attributes[key] ?? "unisex"}
+                            onChange={(e) => handleAttrChange(key, e.target.value)}
+                            className="input-dark"
+                          >
+                            {GENDER_OPTIONS.map((o) => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            id={`attr-${key}`}
+                            type="text"
+                            value={form.attributes[key] ?? ""}
+                            onChange={(e) => handleAttrChange(key, e.target.value)}
+                            placeholder={placeholder}
+                            className="input-dark"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Image upload */}
               <div className="form-group">
                 <label htmlFor="product-image-file" className="form-label">Изображение товара</label>
-                <p id="product-image-help" className="form-help">JPG, PNG или WebP до 5MB</p>
+                <p className="form-help">JPG, PNG или WebP до 5MB</p>
                 <div className="relative aspect-[4/3] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--dark-3)]">
                   {imagePreviewSrc && !previewImageError ? (
-                    <img
-                      src={imagePreviewSrc}
-                      alt=""
-                      className="h-full w-full object-cover"
-                      onError={() => setPreviewImageError(true)}
-                    />
+                    <img src={imagePreviewSrc} alt="" className="h-full w-full object-cover" onError={() => setPreviewImageError(true)} />
                   ) : (
                     <div className="absolute inset-0 grid place-items-center text-center text-[var(--gold-dark)]">
                       <div>
@@ -576,15 +550,8 @@ export default function AdminProducts() {
                       </div>
                     </div>
                   )}
-
                   {selectedImageFile && (
-                    <button
-                      type="button"
-                      onClick={resetSelectedImage}
-                      className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[var(--text-primary)] shadow-sm transition-colors hover:text-red-500"
-                      aria-label="Убрать выбранное изображение"
-                      title="Убрать выбранное изображение"
-                    >
+                    <button type="button" onClick={resetSelectedImage} className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-[var(--text-primary)] shadow-sm transition-colors hover:text-red-500" aria-label="Убрать изображение">
                       <X size={14} />
                     </button>
                   )}
@@ -592,31 +559,17 @@ export default function AdminProducts() {
                 <label htmlFor="product-image-file" className="input-dark flex cursor-pointer items-center gap-2 text-sm">
                   <Upload size={16} className="shrink-0 text-[var(--gold-dark)]" />
                   <span className="truncate">{selectedImageFile ? selectedImageFile.name : "Загрузить изображение"}</span>
-                  <input
-                    id="product-image-file"
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                    onChange={handleImageFileChange}
-                    disabled={saving}
-                    aria-describedby="product-image-help"
-                    className="sr-only"
-                  />
+                  <input id="product-image-file" ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={handleImageFileChange} disabled={saving} className="sr-only" />
                 </label>
               </div>
 
+              {/* Featured toggle */}
               <div className="form-group form-group-inline">
-                <input
-                  id="product-featured"
-                  type="checkbox"
-                  name="is_featured"
-                  checked={form.is_featured}
-                  onChange={handleChange}
-                  className="accent-[var(--gold)] w-4 h-4"
-                />
+                <input id="product-featured" type="checkbox" name="is_featured" checked={form.is_featured} onChange={handleChange} className="accent-[var(--gold)] w-4 h-4" />
                 <label htmlFor="product-featured" className="form-label cursor-pointer">Хит продаж</label>
               </div>
             </div>
+
             <div className="modal-form-actions">
               <button type="button" onClick={closeModal} className="btn-outline-gold flex-1 py-2.5 rounded-lg text-sm cursor-pointer">Отмена</button>
               <button type="button" onClick={handleSave} disabled={saving} className="btn-gold flex-1 py-2.5 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50">
