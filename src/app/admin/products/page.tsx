@@ -277,7 +277,20 @@ export default function AdminProducts() {
         ? ((form.attributes["gender"] ?? "unisex") as "men" | "women" | "unisex")
         : "unisex";
 
-      const basePayload = {
+      // Build payload progressively — strip columns that don't exist yet (pre-migration fallback)
+      type ProductPayload = Record<string, unknown>;
+
+      const save = async (payload: ProductPayload): Promise<string | null> => {
+        if (editId) {
+          const { error } = await supabase.from("products").update(payload).eq("id", editId);
+          return error?.message || null;
+        }
+        const { error } = await supabase.from("products").insert(payload);
+        return error?.message || null;
+      };
+
+      // Start with all known columns
+      let payload: ProductPayload = {
         name: form.name,
         brand: form.brand,
         description: form.description || null,
@@ -293,29 +306,27 @@ export default function AdminProducts() {
         country_of_origin: (form.category !== "accessory" && form.country_of_origin)
           ? form.country_of_origin
           : null,
+        price_usd: price,
       };
 
-      // Try new column name (post-migration), fall back to legacy 'price' column
-      const payloadNew = { ...basePayload, price_usd: price };
-      const payloadLegacy = { ...basePayload, price };
+      let saveError = await save(payload);
 
-      let saveError: string | null = null;
-
-      const trySave = async (p: typeof payloadNew | typeof payloadLegacy) => {
-        if (editId) {
-          const { error } = await supabase.from("products").update(p).eq("id", editId);
-          return error?.message || null;
-        } else {
-          const { error } = await supabase.from("products").insert(p);
-          return error?.message || null;
-        }
-      };
-
-      saveError = await trySave(payloadNew);
-
-      // If price_usd column doesn't exist yet (migration pending), retry with legacy column
-      if (saveError && saveError.includes("price_usd")) {
-        saveError = await trySave(payloadLegacy);
+      // Graceful fallbacks for columns that may not exist if migrations haven't been run yet
+      if (saveError?.includes("price_usd")) {
+        const { price_usd, ...rest } = payload;
+        payload = { ...rest, price: price_usd };
+        saveError = await save(payload);
+      }
+      if (saveError?.includes("country_of_origin")) {
+        const { country_of_origin, ...rest } = payload;
+        payload = rest;
+        saveError = await save(payload);
+      }
+      if (saveError?.includes("category") || saveError?.includes("unit") ||
+          saveError?.includes("attributes") || saveError?.includes("min_volume")) {
+        const { category, unit: u, attributes: a, min_volume, ...rest } = payload;
+        payload = rest;
+        saveError = await save(payload);
       }
 
       if (saveError) {
