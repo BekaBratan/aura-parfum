@@ -6,7 +6,7 @@ export interface Product {
   name: string;
   brand: string;
   description: string | null;
-  price: number;
+  price_usd: number;
   gender: "men" | "women" | "unisex";
   volume_ml: number | null;
   image_url: string | null;
@@ -24,7 +24,7 @@ export interface OrderItem {
   product_id: string;
   name: string;
   brand: string;
-  price: number;
+  price_usd: number;
   quantity: number;
   volume_ml: number | null;
   image_url: string | null;
@@ -43,7 +43,9 @@ export interface Order {
   customer_address: string;
   comment: string | null;
   items: OrderItem[];
-  total_price: number;
+  total_usd: number;
+  display_currency_code: string;
+  total_display_currency: number | null;
   created_at: string;
 }
 
@@ -64,4 +66,11 @@ export interface FilterState {
   category: ProductCategory | null;
   attributeFilters: Record<string, string[]>;
   countries: string[];
+}
+
+export interface CurrencyRate {
+  id: string;
+  currency_code: string;
+  rate_to_usd: number;
+  updated_at: string;
 }

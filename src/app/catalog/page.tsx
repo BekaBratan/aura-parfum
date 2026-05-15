@@ -222,10 +222,10 @@ function CatalogContent() {
     });
 
     if (filters.priceMin !== null) {
-      list = list.filter((p) => p.price >= filters.priceMin!);
+      list = list.filter((p) => p.price_usd >= filters.priceMin!);
     }
     if (filters.priceMax !== null) {
-      list = list.filter((p) => p.price <= filters.priceMax!);
+      list = list.filter((p) => p.price_usd <= filters.priceMax!);
     }
     if (filters.inStockOnly) {
       list = list.filter((p) => Number(p.count ?? 0) > 0);
@@ -233,10 +233,10 @@ function CatalogContent() {
 
     switch (filters.sortBy) {
       case "price_asc":
-        list.sort((a, b) => a.price - b.price);
+        list.sort((a, b) => a.price_usd - b.price_usd);
         break;
       case "price_desc":
-        list.sort((a, b) => b.price - a.price);
+        list.sort((a, b) => b.price_usd - a.price_usd);
         break;
       default:
         list.sort(

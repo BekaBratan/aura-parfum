@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
-import { formatPrice, UNIT_LABELS } from "@/lib/utils";
+import { formatPriceUsd, UNIT_LABELS } from "@/lib/utils";
+import { useCurrencyStore } from "@/store/currencyStore";
 import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
@@ -43,7 +44,8 @@ export default function CartPage() {
   const items = useCartStore((s) => s.items);
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
-  const totalPrice = useCartStore((s) => s.totalPrice);
+  const totalUsd = useCartStore((s) => s.totalUsd);
+  const kztRate = useCurrencyStore((s) => s.kztRate);
   const clearCart = useCartStore((s) => s.clearCart);
   const syncItemsWithProducts = useCartStore((s) => s.syncItemsWithProducts);
   const [mounted, setMounted] = useState(false);
@@ -71,7 +73,7 @@ export default function CartPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, brand, price, volume_ml, image_url, count, unit, category")
+        .select("id, name, brand, price_usd, volume_ml, image_url, count, unit, category")
         .in("id", productIds);
 
       setRefreshing(false);
@@ -81,9 +83,9 @@ export default function CartPage() {
         return;
       }
 
-      const priceById = new Map(currentItems.map((item) => [item.product_id, Number(item.price)]));
+      const priceById = new Map(currentItems.map((item) => [item.product_id, Number(item.price_usd)]));
       const changedPriceIds = (data as CartProductSnapshot[])
-        .filter((product) => priceById.has(product.id) && priceById.get(product.id) !== Number(product.price))
+        .filter((product) => priceById.has(product.id) && priceById.get(product.id) !== Number(product.price_usd))
         .map((product) => product.id);
 
       syncItemsWithProducts(data as CartProductSnapshot[]);
@@ -121,7 +123,7 @@ export default function CartPage() {
           const currentItem = currentItems.find((item) => item.product_id === product.id);
           if (!currentItem) return;
 
-          if (Number(currentItem.price) !== Number(product.price)) {
+          if (Number(currentItem.price_usd) !== Number(product.price_usd)) {
             setPriceUpdatedIds((current) => new Set(current).add(product.id));
           }
 
@@ -255,7 +257,7 @@ export default function CartPage() {
                 </div>
 
                 <div className="cart-line-total">
-                  <p className="price">{formatPrice(item.price * item.quantity)}</p>
+                  <p className="price">{formatPriceUsd(item.price_usd * item.quantity, kztRate)}</p>
                   <button onClick={() => removeItem(item.product_id)} className="btn btn-ghost">
                     Удалить
                   </button>
@@ -268,7 +270,7 @@ export default function CartPage() {
         <div className="card summary-card">
           <div className="summary-row">
             <span>Итого</span>
-            <span className="summary-total">{formatPrice(totalPrice())}</span>
+            <span className="summary-total">{formatPriceUsd(totalUsd(), kztRate)}</span>
           </div>
 
           {hasInvalidStock ? (

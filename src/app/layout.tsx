@@ -3,6 +3,7 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import CurrencyLoader from "@/components/layout/CurrencyLoader";
 
 export const metadata: Metadata = {
   title: {
@@ -22,6 +23,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <body className="site-shell">
+        <CurrencyLoader />
         <Navbar />
         <main className="site-main">{children}</main>
         <Footer />

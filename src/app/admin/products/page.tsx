@@ -6,9 +6,11 @@ import { ImageIcon, Loader2, Pencil, Plus, Save, Trash2, Upload, X } from "lucid
 import toast from "react-hot-toast";
 import { useAdminRole } from "@/lib/adminRole";
 import { createClient } from "@/lib/supabase/client";
-import { formatPrice, CATEGORY_LABELS, UNIT_LABELS } from "@/lib/utils";
+import { CATEGORY_LABELS, UNIT_LABELS } from "@/lib/utils";
+import { formatKzt, convertToKzt } from "@/lib/currency";
 import { Product, ProductCategory } from "@/types";
 import { COUNTRIES } from "@/lib/countries";
+import { useCurrencyStore } from "@/store/currencyStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,6 +150,7 @@ function ProductThumbnail({ product }: { product: Product }) {
 export default function AdminProducts() {
   const { role } = useAdminRole();
   const isAdmin = role === "admin";
+  const kztRate = useCurrencyStore((s) => s.kztRate);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -205,7 +208,7 @@ export default function AdminProducts() {
       name: product.name,
       brand: product.brand,
       description: product.description || "",
-      price: String(product.price ?? ""),
+      price: String(product.price_usd ?? ""),
       category: product.category ?? "perfume",
       volume_ml: product.volume_ml === null ? "" : String(product.volume_ml),
       min_volume: product.min_volume === null ? "" : String(product.min_volume),
@@ -278,7 +281,7 @@ export default function AdminProducts() {
         name: form.name,
         brand: form.brand,
         description: form.description || null,
-        price,
+        price_usd: price,
         gender: genderVal,
         volume_ml: volumeMl,
         image_url: imageUrl,
@@ -363,7 +366,7 @@ export default function AdminProducts() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  const priceLabel = isMl ? "Цена, ₸/мл" : "Цена, ₸/шт.";
+  const priceLabel = isMl ? "Цена, $/мл" : "Цена, $/шт.";
   const countLabel = isMl ? "Запас, мл" : "Остаток, шт.";
   const countHelp = isMl ? "Общий запас в мл" : "Если товара нет, поставьте 0";
   const attrFields = CATEGORY_ATTR_FIELDS[form.category];
@@ -415,7 +418,7 @@ export default function AdminProducts() {
                       </span>
                     </td>
                     <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">
-                      {formatPrice(product.price)}{unit === "ml" ? " /мл" : ""}
+                      {formatKzt(convertToKzt(product.price_usd, kztRate))}{unit === "ml" ? " /мл" : ""}
                     </td>
                     <td className="py-3 pr-4 hidden md:table-cell">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
@@ -479,7 +482,12 @@ export default function AdminProducts() {
               <div className="form-grid">
                 <div className="form-group">
                   <label htmlFor="product-price" className="form-label">{priceLabel}</label>
-                  <input id="product-price" name="price" type="text" inputMode="numeric" pattern="[0-9]*" value={form.price} onChange={handleChange} placeholder={isMl ? "Например: 910" : "Например: 500"} className="input-dark" />
+                  <input id="product-price" name="price" type="text" inputMode="numeric" pattern="[0-9]*" value={form.price} onChange={handleChange} placeholder={isMl ? "Например: 2.50" : "Например: 5.00"} className="input-dark" />
+                  {form.price && Number(form.price) > 0 && (
+                    <p className="form-help" style={{ color: "var(--gold)" }}>
+                      ≈ {formatKzt(convertToKzt(Number(form.price), kztRate))}{isMl ? " / мл" : ""}
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-group">

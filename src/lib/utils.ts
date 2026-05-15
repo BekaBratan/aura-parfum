@@ -1,15 +1,18 @@
 import type { ProductCategory, ProductUnit } from "@/types";
+import { formatKzt, convertToKzt } from "@/lib/currency";
 
-export function formatPrice(price: number): string {
-  return new Intl.NumberFormat("ru-KZ", {
-    style: "currency",
-    currency: "KZT",
-    maximumFractionDigits: 0,
-  }).format(price);
+// Format a KZT amount (already converted)
+export function formatPrice(kztAmount: number): string {
+  return formatKzt(kztAmount);
 }
 
-export function formatPricePerUnit(price: number, unit: ProductUnit): string {
-  return `${formatPrice(price)} / ${UNIT_LABELS[unit]}`;
+// Convert USD → KZT and format
+export function formatPriceUsd(priceUsd: number, kztRate: number): string {
+  return formatKzt(convertToKzt(priceUsd, kztRate));
+}
+
+export function formatPricePerUnit(priceUsd: number, unit: ProductUnit, kztRate: number): string {
+  return `${formatPriceUsd(priceUsd, kztRate)} / ${UNIT_LABELS[unit]}`;
 }
 
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {

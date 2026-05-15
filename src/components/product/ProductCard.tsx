@@ -3,8 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
-import { formatPrice, formatPricePerUnit, UNIT_LABELS } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, UNIT_LABELS } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
+import { useCurrencyStore } from "@/store/currencyStore";
 import { Product } from "@/types";
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
@@ -19,6 +20,7 @@ export default function ProductCard({
   variant?: ProductCardVariant;
 }) {
   const addItem = useCartStore((s) => s.addItem);
+  const kztRate = useCurrencyStore((s) => s.kztRate);
   const [imageError, setImageError] = useState(false);
   const productCount = Number(product.count ?? 0);
   const isAvailable = productCount > 0;
@@ -46,7 +48,7 @@ export default function ProductCard({
       product_id: product.id,
       name: product.name,
       brand: product.brand,
-      price: product.price,
+      price_usd: product.price_usd,
       volume_ml: product.volume_ml,
       image_url: product.image_url,
       count: productCount,
@@ -61,8 +63,8 @@ export default function ProductCard({
     : "Нет в наличии";
 
   const priceDisplay = isMl
-    ? formatPricePerUnit(product.price, "ml")
-    : formatPrice(product.price);
+    ? formatPricePerUnit(product.price_usd, "ml", kztRate)
+    : formatPriceUsd(product.price_usd, kztRate);
 
   return (
     <Link
@@ -70,7 +72,6 @@ export default function ProductCard({
       className={`product-card-link product-card-link--${variant}`}
     >
       <article className={cardClassName}>
-        {/* Image block */}
         <div
           className={
             isList
@@ -107,7 +108,6 @@ export default function ProductCard({
             )}
           </div>
 
-          {/* Quick-add only for accessories in grid view */}
           {isAvailable && !isList && !isMl && (
             <button
               onClick={handleAddAccessory}
@@ -119,7 +119,6 @@ export default function ProductCard({
           )}
         </div>
 
-        {/* Content */}
         {isList ? (
           <>
             <div className="product-list-content">
@@ -135,7 +134,9 @@ export default function ProductCard({
             </div>
 
             <div className="product-list-actions">
-              <p className="price">{priceDisplay}</p>
+              <div>
+                <p className="price">{priceDisplay}</p>
+              </div>
               {isMl ? (
                 <Link
                   href={`/product/${product.id}`}

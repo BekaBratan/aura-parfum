@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AdminRoleProvider, StaffRole } from "@/lib/adminRole";
-import { LayoutDashboard, Package, ShoppingCart, LogOut, Menu, X, Users } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, LogOut, Menu, X, Users, DollarSign } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -71,7 +71,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin", label: "Панель", icon: LayoutDashboard },
     { href: "/admin/products", label: "Товары", icon: Package },
     { href: "/admin/orders", label: "Заказы", icon: ShoppingCart },
-    ...(staffRole === "admin" ? [{ href: "/admin/staff", label: "Сотрудники", icon: Users }] : []),
+    ...(staffRole === "admin" ? [
+      { href: "/admin/staff", label: "Сотрудники", icon: Users },
+      { href: "/admin/currencies", label: "Курсы валют", icon: DollarSign },
+    ] : []),
   ];
   const roleLabel = staffRole === "admin" ? "Администратор" : "Кассир";
 

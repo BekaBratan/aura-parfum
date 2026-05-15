@@ -98,7 +98,7 @@ export default function AdminOrders() {
                     <p className="text-xs text-[var(--text-secondary)]">{order.customer_name}</p>
                   </td>
                   <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{order.customer_phone}</td>
-                  <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">{formatPrice(order.total_price)}</td>
+                  <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">{formatPrice(order.total_display_currency ?? order.total_usd)}</td>
                   <td className="py-3 pr-4">
                     <StatusSelect
                       value={order.payment_status}
@@ -154,14 +154,14 @@ export default function AdminOrders() {
                     <span className="text-[var(--text-secondary)]">
                       {item.brand} {item.name} {item.volume_ml ? `${item.volume_ml}ml` : ""} x {item.quantity}
                     </span>
-                    <span className="text-[var(--text-primary)] whitespace-nowrap">{formatPrice(item.price * item.quantity)}</span>
+                    <span className="text-[var(--text-primary)] whitespace-nowrap">{formatPrice((item.price_usd ?? (item as unknown as {price:number}).price) * item.quantity)}</span>
                   </div>
                 ))}
               </div>
 
               <div className="border-t border-[var(--border)] pt-3 flex justify-between">
                 <span className="font-semibold text-[var(--text-primary)]">Итого</span>
-                <span className="font-bold text-lg text-gold-gradient">{formatPrice(detail.total_price)}</span>
+                <span className="font-bold text-lg text-gold-gradient">{formatPrice(detail.total_display_currency ?? detail.total_usd)}</span>
               </div>
             </div>
           </div>

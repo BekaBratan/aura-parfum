@@ -6,8 +6,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
-import { formatPrice, formatPricePerUnit, UNIT_LABELS } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, UNIT_LABELS } from "@/lib/utils";
+import { formatUsd } from "@/lib/currency";
 import { useCartStore } from "@/store/cartStore";
+import { useCurrencyStore } from "@/store/currencyStore";
 import { ShoppingBag, ArrowLeft, Check, X as XIcon } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -16,7 +18,6 @@ const ATTRIBUTE_LABELS: Record<string, string> = {
   family: "Семейство",
   oil_type: "Тип масла",
   aroma_note: "Нота",
-  country: "Страна",
   type: "Тип",
   material: "Материал",
   color: "Цвет",
@@ -32,6 +33,7 @@ export default function ProductPage() {
   const [imageError, setImageError] = useState(false);
   const [chosenVolume, setChosenVolume] = useState<number>(1);
   const addItem = useCartStore((s) => s.addItem);
+  const kztRate = useCurrencyStore((s) => s.kztRate);
 
   const productCount = Number(product?.count ?? 0);
   const isAvailable = productCount > 0;
@@ -52,11 +54,8 @@ export default function ProductPage() {
     load();
   }, [id]);
 
-  // Init volume input when product loads
   useEffect(() => {
-    if (product) {
-      setChosenVolume(product.min_volume ?? 1);
-    }
+    if (product) setChosenVolume(product.min_volume ?? 1);
   }, [product?.id, product?.min_volume]);
 
   useEffect(() => {
@@ -76,7 +75,7 @@ export default function ProductPage() {
       product_id: product.id,
       name: product.name,
       brand: product.brand,
-      price: product.price,
+      price_usd: product.price_usd,
       volume_ml: isMl ? qty : product.volume_ml,
       image_url: product.image_url,
       count: productCount,
@@ -84,9 +83,8 @@ export default function ProductPage() {
       category: product.category ?? "accessory",
       quantity: qty,
     });
-    const label = isMl
-      ? `${qty} мл → ${formatPrice(product.price * qty)}`
-      : product.name;
+    const totalKzt = formatPriceUsd(product.price_usd * qty, kztRate);
+    const label = isMl ? `${qty} мл → ${totalKzt}` : product.name;
     toast.success(`Добавлено: ${label}`);
   };
 
@@ -118,12 +116,14 @@ export default function ProductPage() {
     );
   }
 
-  const totalPrice = isMl ? product.price * chosenVolume : product.price;
+  const totalKzt = formatPriceUsd(
+    isMl ? product.price_usd * chosenVolume : product.price_usd,
+    kztRate
+  );
   const availabilityText = isAvailable
     ? `В наличии: ${productCount} ${UNIT_LABELS[product.unit ?? "pcs"]}`
     : "Нет в наличии";
 
-  // Filter out empty attributes for display
   const attributeEntries = Object.entries(product.attributes ?? {}).filter(
     ([, v]) => v !== "" && v !== null && v !== undefined
   );
@@ -137,7 +137,6 @@ export default function ProductPage() {
         </Link>
 
         <div className="product-detail-grid">
-          {/* Image */}
           <div className="product-detail-image">
             {product.image_url && !imageError ? (
               <Image
@@ -164,23 +163,25 @@ export default function ProductPage() {
             )}
           </div>
 
-          {/* Detail panel */}
           <div className="detail-panel">
             <div>
               <p className="product-brand">{product.brand}</p>
               <h1 className="detail-title">{product.name}</h1>
             </div>
 
-            {/* Price display */}
-            {isMl ? (
-              <div className="detail-price-block">
-                <p className="price detail-price">
-                  {formatPricePerUnit(product.price, "ml")}
-                </p>
-              </div>
-            ) : (
-              <p className="price detail-price">{formatPrice(product.price)}</p>
-            )}
+            {/* Price */}
+            <div className="detail-price-block">
+              <p className="price detail-price">
+                {isMl
+                  ? formatPricePerUnit(product.price_usd, "ml", kztRate)
+                  : formatPriceUsd(product.price_usd, kztRate)}
+              </p>
+              <p className="detail-price-usd">
+                {isMl
+                  ? `${formatUsd(product.price_usd)} / мл`
+                  : formatUsd(product.price_usd)}
+              </p>
+            </div>
 
             {/* Volume selector for ml products */}
             {isMl && (
@@ -205,9 +206,7 @@ export default function ProductPage() {
                   />
                   <span className="volume-unit">мл</span>
                   {isAvailable && (
-                    <span className="volume-total">
-                      = {formatPrice(totalPrice)}
-                    </span>
+                    <span className="volume-total">= {totalKzt}</span>
                   )}
                 </div>
               </div>
@@ -217,7 +216,6 @@ export default function ProductPage() {
               <p className="detail-description">{product.description}</p>
             )}
 
-            {/* Details card */}
             <div className="card detail-list">
               <div className="detail-row">
                 <span>Наличие</span>
@@ -232,7 +230,6 @@ export default function ProductPage() {
                 )}
               </div>
 
-              {/* Country of origin */}
               {product.country_of_origin && (
                 <div className="detail-row">
                   <span>Страна происхождения</span>
@@ -240,7 +237,6 @@ export default function ProductPage() {
                 </div>
               )}
 
-              {/* Render all product attributes */}
               {attributeEntries.map(([key, value]) => (
                 <div key={key} className="detail-row">
                   <span>{ATTRIBUTE_LABELS[key] ?? key}</span>
@@ -251,10 +247,12 @@ export default function ProductPage() {
               ))}
             </div>
 
-            {/* Add to cart */}
             <button
               onClick={handleAdd}
-              disabled={!isAvailable || (isMl && (chosenVolume < minVolume || chosenVolume > productCount))}
+              disabled={
+                !isAvailable ||
+                (isMl && (chosenVolume < minVolume || chosenVolume > productCount))
+              }
               className={`btn ${isAvailable ? "btn-primary" : "btn-secondary"}`}
             >
               <ShoppingBag size={18} />

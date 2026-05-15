@@ -6,7 +6,7 @@ export type CartProductSnapshot = {
   id: string;
   name: string;
   brand: string;
-  price: number;
+  price_usd: number;
   volume_ml: number | null;
   image_url: string | null;
   count: number | null;
@@ -22,7 +22,7 @@ interface CartStore {
   syncItemsWithProducts: (products: CartProductSnapshot[]) => void;
   clearCart: () => void;
   totalItems: () => number;
-  totalPrice: () => number;
+  totalUsd: () => number;
 }
 
 export const useCartStore = create<CartStore>()(
@@ -40,7 +40,6 @@ export const useCartStore = create<CartStore>()(
         const existing = get().items.find((i) => i.product_id === item.product_id);
 
         if (existing && item.unit === "pcs") {
-          // Accessories: increment quantity in cart
           set({
             items: get().items.map((i) =>
               i.product_id === item.product_id
@@ -49,7 +48,6 @@ export const useCartStore = create<CartStore>()(
             ),
           });
         } else if (existing && item.unit === "ml") {
-          // ml products: replace with new chosen volume (each add is a fresh choice)
           set({
             items: get().items.map((i) =>
               i.product_id === item.product_id
@@ -81,23 +79,19 @@ export const useCartStore = create<CartStore>()(
       },
 
       syncItemsWithProducts: (products) => {
-        const productsById = new Map(products.map((product) => [product.id, product]));
-
+        const productsById = new Map(products.map((p) => [p.id, p]));
         set({
           items: get().items.map((item) => {
             const product = productsById.get(item.product_id);
             if (!product) return item;
-
-            const availableCount = Number(product.count ?? 0);
-
             return {
               ...item,
               name: product.name,
               brand: product.brand,
-              price: Number(product.price),
+              price_usd: Number(product.price_usd),
               volume_ml: item.unit === "ml" ? item.quantity : product.volume_ml,
               image_url: product.image_url,
-              count: availableCount,
+              count: Number(product.count ?? 0),
               unit: product.unit,
               category: product.category,
             };
@@ -109,8 +103,8 @@ export const useCartStore = create<CartStore>()(
 
       totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
 
-      totalPrice: () =>
-        get().items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+      totalUsd: () =>
+        get().items.reduce((sum, i) => sum + i.price_usd * i.quantity, 0),
     }),
     { name: "aura-cart" }
   )

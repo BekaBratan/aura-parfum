@@ -10,7 +10,7 @@ import { Download, Loader2, Send, ShoppingBag } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
-import { formatPrice, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/utils";
+import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/utils";
 
 pdfMake.addVirtualFileSystem(pdfFonts);
 
@@ -70,8 +70,8 @@ function buildInvoicePdfDefinition(order: Order): TDocumentDefinitions {
   const productRows: TableCell[][] = order.items.map((item) => [
     { text: getProductLine(item) },
     { text: getQtyLabel(item), alignment: "center" },
-    { text: formatKzt(item.price), alignment: "right" },
-    { text: formatKzt(item.price * item.quantity), alignment: "right" },
+    { text: formatKzt(item.price_usd), alignment: "right" },
+    { text: formatKzt(item.price_usd * item.quantity), alignment: "right" },
   ]);
 
   const customerRows: [string, string][] = [
@@ -144,7 +144,7 @@ function buildInvoicePdfDefinition(order: Order): TDocumentDefinitions {
         },
         layout: "lightHorizontalLines",
       },
-      { text: `Итого: ${formatKzt(order.total_price)}`, style: "total" },
+      { text: `Итого: ${formatKzt(order.total_display_currency ?? order.total_usd)}`, style: "total" },
     ],
   };
 }
@@ -168,8 +168,8 @@ function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string) {
   const productLines = order.items.map((item, index) => {
     const product = getProductLine(item);
     const qty = getQtyLabel(item);
-    const lineTotal = item.price * item.quantity;
-    return `${index + 1}. ${product} - ${qty} × ${formatKzt(item.price)} = ${formatKzt(lineTotal)}`;
+    const lineTotal = item.price_usd * item.quantity;
+    return `${index + 1}. ${product} - ${qty} × ${formatKzt(item.price_usd)} = ${formatKzt(lineTotal)}`;
   });
 
   return [
@@ -183,7 +183,7 @@ function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string) {
     "Товары:",
     ...productLines,
     "",
-    `Итого: ${formatKzt(order.total_price)}`,
+    `Итого: ${formatKzt(order.total_display_currency ?? order.total_usd)}`,
     `Статус оплаты: ${PDF_PAYMENT_STATUS_LABELS[order.payment_status]}`,
     "",
     "PDF-накладная:",
@@ -338,16 +338,16 @@ export default function InvoicePage() {
                   <div>
                     <p className="product-title">{item.brand} {item.name}</p>
                     <p className="product-meta">
-                      {getQtyLabel(item)} × {formatPrice(item.price)}
+                      {getQtyLabel(item)} × {formatKzt(item.price_usd)}
                     </p>
                   </div>
-                  <strong>{formatPrice(item.price * item.quantity)}</strong>
+                  <strong>{formatKzt(item.price_usd * item.quantity)}</strong>
                 </div>
               ))}
             </div>
             <div className="summary-row order-total-row">
               <span>Итого</span>
-              <span className="summary-total">{formatPrice(order.total_price)}</span>
+              <span className="summary-total">{formatKzt(order.total_display_currency ?? order.total_usd)}</span>
             </div>
           </div>
 
