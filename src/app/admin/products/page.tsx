@@ -277,11 +277,10 @@ export default function AdminProducts() {
         ? ((form.attributes["gender"] ?? "unisex") as "men" | "women" | "unisex")
         : "unisex";
 
-      const payload = {
+      const basePayload = {
         name: form.name,
         brand: form.brand,
         description: form.description || null,
-        price_usd: price,
         gender: genderVal,
         volume_ml: volumeMl,
         image_url: imageUrl,
@@ -296,18 +295,32 @@ export default function AdminProducts() {
           : null,
       };
 
+      // Try new column name (post-migration), fall back to legacy 'price' column
+      const payloadNew = { ...basePayload, price_usd: price };
+      const payloadLegacy = { ...basePayload, price };
+
       let saveError: string | null = null;
-      if (editId) {
-        const { error } = await supabase.from("products").update(payload).eq("id", editId);
-        saveError = error?.message || null;
-      } else {
-        const { error } = await supabase.from("products").insert(payload);
-        saveError = error?.message || null;
+
+      const trySave = async (p: typeof payloadNew | typeof payloadLegacy) => {
+        if (editId) {
+          const { error } = await supabase.from("products").update(p).eq("id", editId);
+          return error?.message || null;
+        } else {
+          const { error } = await supabase.from("products").insert(p);
+          return error?.message || null;
+        }
+      };
+
+      saveError = await trySave(payloadNew);
+
+      // If price_usd column doesn't exist yet (migration pending), retry with legacy column
+      if (saveError && saveError.includes("price_usd")) {
+        saveError = await trySave(payloadLegacy);
       }
 
       if (saveError) {
         if (uploadedPath) await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([uploadedPath]);
-        toast.error(editId ? "Ошибка обновления" : "Ошибка создания");
+        toast.error(saveError);
         return;
       }
 
