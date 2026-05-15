@@ -15,6 +15,7 @@ export default function ProductPage() {
   const { id } = useParams();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
   const productCount = Number(product?.count ?? 0);
   const isAvailable = productCount > 0;
@@ -32,6 +33,10 @@ export default function ProductPage() {
     }
     load();
   }, [id]);
+
+  useEffect(() => {
+    setImageError(false);
+  }, [product?.image_url]);
 
   const handleAdd = () => {
     if (!product || !isAvailable) return;
@@ -85,7 +90,7 @@ export default function ProductPage() {
 
         <div className="product-detail-grid">
           <div className="product-detail-image">
-            {product.image_url ? (
+            {product.image_url && !imageError ? (
               <Image
                 src={product.image_url}
                 alt={product.name}
@@ -93,6 +98,7 @@ export default function ProductPage() {
                 className="product-detail-img"
                 sizes="(max-width: 768px) 100vw, 50vw"
                 priority
+                onError={() => setImageError(true)}
               />
             ) : (
               <div className="image-placeholder">

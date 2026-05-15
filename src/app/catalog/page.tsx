@@ -4,7 +4,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Product, FilterState } from "@/types";
 import ProductCard from "@/components/product/ProductCard";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Grid2X2, List, Search, SlidersHorizontal, X } from "lucide-react";
+
+type CatalogViewMode = "grid" | "list";
+
+const CATALOG_VIEW_STORAGE_KEY = "catalogViewMode";
 
 const GENDERS = [
   { value: "men", label: "Мужские" },
@@ -25,6 +29,7 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [brands, setBrands] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<CatalogViewMode>("grid");
 
   const [filters, setFilters] = useState<FilterState>({
     search: "",
@@ -39,17 +44,30 @@ export default function CatalogPage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .order("created_at", { ascending: false });
-      const list = (data as Product[]) || [];
-      setProducts(list);
-      setBrands([...new Set(list.map((product) => product.brand))].sort());
-      setLoading(false);
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("products")
+          .select("*")
+          .order("created_at", { ascending: false });
+        if (error) throw error;
+        const list = (data as Product[]) || [];
+        setProducts(list);
+        setBrands([...new Set(list.map((product) => product.brand))].sort());
+      } catch (err) {
+        console.error("Не удалось загрузить товары:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
+  }, []);
+
+  useEffect(() => {
+    const storedViewMode = window.localStorage.getItem(CATALOG_VIEW_STORAGE_KEY);
+    if (storedViewMode === "grid" || storedViewMode === "list") {
+      setViewMode(storedViewMode);
+    }
   }, []);
 
   const filtered = useMemo(() => {
@@ -136,6 +154,11 @@ export default function CatalogPage() {
       sortBy: "newest",
     });
 
+  const handleViewModeChange = (mode: CatalogViewMode) => {
+    setViewMode(mode);
+    window.localStorage.setItem(CATALOG_VIEW_STORAGE_KEY, mode);
+  };
+
   const hasActiveFilters =
     filters.brands.length > 0 ||
     filters.genders.length > 0 ||
@@ -157,21 +180,21 @@ export default function CatalogPage() {
           </div>
         </div>
 
-        <div className="catalog-toolbar">
-          <div className="search-field">
-            <Search size={18} />
-            <input
-              type="text"
-              placeholder="Поиск по названию или бренду..."
-              value={filters.search}
-              onChange={(e) =>
-                setFilters((current) => ({ ...current, search: e.target.value }))
-              }
-              className="input"
-            />
-          </div>
+        <div className="catalog-controls">
+          <div className="catalog-controls-main">
+            <div className="search-field catalog-search">
+              <Search size={18} />
+              <input
+                type="text"
+                placeholder="Поиск по названию или бренду..."
+                value={filters.search}
+                onChange={(e) =>
+                  setFilters((current) => ({ ...current, search: e.target.value }))
+                }
+                className="input"
+              />
+            </div>
 
-          <div className="toolbar-actions">
             <select
               value={filters.sortBy}
               onChange={(e) =>
@@ -180,7 +203,7 @@ export default function CatalogPage() {
                   sortBy: e.target.value as FilterState["sortBy"],
                 }))
               }
-              className="select"
+              className="select catalog-sort"
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -188,10 +211,33 @@ export default function CatalogPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className="catalog-actions">
+            <div className="view-toggle" aria-label="Вид каталога">
+              <button
+                type="button"
+                onClick={() => handleViewModeChange("grid")}
+                className={`view-toggle-button ${viewMode === "grid" ? "active" : ""}`}
+                aria-pressed={viewMode === "grid"}
+              >
+                <Grid2X2 size={15} />
+                Плитка
+              </button>
+              <button
+                type="button"
+                onClick={() => handleViewModeChange("list")}
+                className={`view-toggle-button ${viewMode === "list" ? "active" : ""}`}
+                aria-pressed={viewMode === "list"}
+              >
+                <List size={15} />
+                Список
+              </button>
+            </div>
 
             <button
               onClick={() => setShowFilters((open) => !open)}
-              className={`btn ${showFilters || hasActiveFilters ? "btn-primary" : "btn-secondary"}`}
+              className={`btn filter-button ${showFilters || hasActiveFilters ? "btn-primary" : "btn-secondary"}`}
             >
               <SlidersHorizontal size={16} />
               Фильтры
@@ -307,11 +353,18 @@ export default function CatalogPage() {
         </p>
 
         {loading ? (
-          <div className="product-grid catalog-results">
+          <div className={`${viewMode === "list" ? "product-list" : "product-grid compact-grid"} catalog-results`}>
             {Array.from({ length: 8 }).map((_, index) => (
-              <div key={index} className="product-card">
-                <div className="product-card-image skeleton" />
-                <div className="product-card-body">
+              <div
+                key={index}
+                className={`product-card product-card--${viewMode} ${
+                  viewMode === "grid" ? "product-card--compact" : "product-list-item"
+                }`}
+              >
+                <div
+                  className={`${viewMode === "list" ? "product-list-media " : ""}product-card-media product-card-image skeleton`}
+                />
+                <div className={viewMode === "list" ? "product-list-content" : "product-card-body"}>
                   <div className="skeleton skeleton-line is-short" />
                   <div className="skeleton skeleton-line is-full" />
                   <div className="skeleton skeleton-line is-medium" />
@@ -329,9 +382,9 @@ export default function CatalogPage() {
             </div>
           </div>
         ) : (
-          <div className="product-grid catalog-results">
+          <div className={`${viewMode === "list" ? "product-list" : "product-grid compact-grid"} catalog-results`}>
             {filtered.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard key={product.id} product={product} variant={viewMode} />
             ))}
           </div>
         )}
