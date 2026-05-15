@@ -119,12 +119,16 @@ function createUploadPath(file: File, form: FormState, productId: string | null)
   return `products/${baseName}-${Date.now()}.${extension}`;
 }
 
-function normalizeNumericInput(value: string, allowZero: boolean): string {
-  const digits = value.replace(/\D/g, "");
-  if (digits === "") return "";
-  const normalized = digits.replace(/^0+(?=\d)/, "");
-  if (!allowZero && normalized === "0") return "";
-  return normalized;
+// Allow any decimal input for price (e.g. "2.50")
+function normalizeDecimalInput(value: string): string {
+  // Keep digits and at most one decimal point
+  const cleaned = value.replace(/[^0-9.]/g, "").replace(/(\.\d*)\./g, "$1");
+  return cleaned;
+}
+
+// Allow integer-only input; just strip non-digits, allow empty
+function normalizeIntInput(value: string): string {
+  return value.replace(/\D/g, "");
 }
 
 // ─── Thumbnail component ───────────────────────────────────────────────────
@@ -362,8 +366,12 @@ export default function AdminProducts() {
       setForm((prev) => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
       return;
     }
-    if (["price", "volume_ml", "count", "min_volume"].includes(name)) {
-      setForm((prev) => ({ ...prev, [name]: normalizeNumericInput(value, name === "count") }));
+    if (name === "price") {
+      setForm((prev) => ({ ...prev, price: normalizeDecimalInput(value) }));
+      return;
+    }
+    if (["volume_ml", "count", "min_volume"].includes(name)) {
+      setForm((prev) => ({ ...prev, [name]: normalizeIntInput(value) }));
       return;
     }
     if (name === "category") {
@@ -506,7 +514,7 @@ export default function AdminProducts() {
               <div className="form-grid">
                 <div className="form-group">
                   <label htmlFor="product-price" className="form-label">{priceLabel}</label>
-                  <input id="product-price" name="price" type="text" inputMode="numeric" pattern="[0-9]*" value={form.price} onChange={handleChange} placeholder={isMl ? "Например: 2.50" : "Например: 5.00"} className="input-dark" />
+                  <input id="product-price" name="price" type="text" inputMode="decimal" value={form.price} onChange={handleChange} placeholder={isMl ? "Например: 2.50" : "Например: 5.00"} className="input-dark" />
                   {form.price && Number(form.price) > 0 && (
                     <p className="form-help" style={{ color: "var(--gold)" }}>
                       ≈ {formatKzt(convertToKzt(Number(form.price), kztRate))}{isMl ? " / мл" : ""}
