@@ -9,6 +9,7 @@ import { useCurrencyStore } from "@/store/currencyStore";
 import Image from "next/image";
 import Link from "next/link";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
+import MlInput from "@/components/ui/MlInput";
 import { CartItem } from "@/types";
 
 type CartStockWarning = {
@@ -236,15 +237,11 @@ export default function CartPage() {
 
                 {item.unit === "ml" ? (
                   <div className="cart-ml-input">
-                    <input
-                      type="number"
+                    <MlInput
+                      value={item.quantity}
                       min={1}
                       max={availableCount || undefined}
-                      value={item.quantity}
-                      onChange={(e) => {
-                        const v = parseInt(e.target.value, 10);
-                        if (!isNaN(v) && v >= 1) updateQuantity(item.product_id, v);
-                      }}
+                      onChange={(v) => updateQuantity(item.product_id, v)}
                       className="input volume-input"
                       aria-label="Объём, мл"
                     />

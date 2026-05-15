@@ -11,6 +11,7 @@ import { formatUsd } from "@/lib/currency";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { ShoppingBag, ArrowLeft, Check, X as XIcon } from "lucide-react";
+import MlInput from "@/components/ui/MlInput";
 import toast from "react-hot-toast";
 
 const ATTRIBUTE_LABELS: Record<string, string> = {
@@ -61,12 +62,6 @@ export default function ProductPage() {
   useEffect(() => {
     setImageError(false);
   }, [product?.image_url]);
-
-  const handleVolumeChange = (raw: string) => {
-    const val = parseInt(raw, 10);
-    if (isNaN(val)) return;
-    setChosenVolume(Math.min(Math.max(val, minVolume), productCount));
-  };
 
   const handleAdd = () => {
     if (!product || !isAvailable) return;
@@ -194,14 +189,12 @@ export default function ProductPage() {
                   </span>
                 </label>
                 <div className="volume-selector-row">
-                  <input
-                    type="number"
+                  <MlInput
+                    value={chosenVolume}
                     min={minVolume}
                     max={productCount}
-                    step={1}
-                    value={chosenVolume}
-                    onChange={(e) => handleVolumeChange(e.target.value)}
                     disabled={!isAvailable}
+                    onChange={setChosenVolume}
                     className="input volume-input"
                     aria-label="Объём в мл"
                   />
