@@ -17,6 +17,7 @@ export interface Product {
   unit: ProductUnit;
   attributes: Record<string, string | string[]>;
   min_volume: number | null;
+  country_of_origin: string | null;
 }
 
 export interface OrderItem {
@@ -62,4 +63,5 @@ export interface FilterState {
   sortBy: "price_asc" | "price_desc" | "newest";
   category: ProductCategory | null;
   attributeFilters: Record<string, string[]>;
+  countries: string[];
 }

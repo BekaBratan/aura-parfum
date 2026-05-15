@@ -32,7 +32,6 @@ const CATEGORY_ATTRIBUTE_FILTERS: Record<
   oil: [
     { key: "oil_type", label: "Тип масла" },
     { key: "aroma_note", label: "Аромат / нота" },
-    { key: "country", label: "Страна" },
   ],
   perfume: [
     { key: "gender", label: "Пол" },
@@ -45,6 +44,9 @@ const CATEGORY_ATTRIBUTE_FILTERS: Record<
   ],
 };
 
+// Categories where country filter is shown
+const CATEGORIES_WITH_COUNTRY: ProductCategory[] = ["oil", "perfume"];
+
 const DEFAULT_FILTERS: FilterState = {
   search: "",
   brands: [],
@@ -56,6 +58,7 @@ const DEFAULT_FILTERS: FilterState = {
   sortBy: "newest",
   category: null,
   attributeFilters: {},
+  countries: [],
 };
 
 function pluralItems(n: number): string {
@@ -167,6 +170,20 @@ function CatalogContent() {
     return opts;
   }, [categoryProducts, attrFilterConfig]);
 
+  // Country filter options for oil and perfume
+  const showCountryFilter =
+    activeCategory !== null && CATEGORIES_WITH_COUNTRY.includes(activeCategory);
+  const countryOptions = useMemo(() => {
+    if (!showCountryFilter) return [];
+    return [
+      ...new Set(
+        categoryProducts
+          .map((p) => p.country_of_origin)
+          .filter((c): c is string => Boolean(c))
+      ),
+    ].sort();
+  }, [categoryProducts, showCountryFilter]);
+
   // Apply all filters
   const filtered = useMemo(() => {
     let list = activeCategory
@@ -184,6 +201,12 @@ function CatalogContent() {
 
     if (filters.brands.length > 0) {
       list = list.filter((p) => filters.brands.includes(p.brand));
+    }
+
+    if (filters.countries.length > 0) {
+      list = list.filter(
+        (p) => p.country_of_origin && filters.countries.includes(p.country_of_origin)
+      );
     }
 
     // Apply attribute filters
@@ -234,6 +257,15 @@ function CatalogContent() {
     }));
   }, []);
 
+  const toggleCountry = useCallback((country: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      countries: prev.countries.includes(country)
+        ? prev.countries.filter((c) => c !== country)
+        : [...prev.countries, country],
+    }));
+  }, []);
+
   const toggleAttr = useCallback((key: string, value: string) => {
     setFilters((prev) => {
       const current = prev.attributeFilters[key] ?? [];
@@ -254,6 +286,7 @@ function CatalogContent() {
 
   const hasActiveFilters =
     filters.brands.length > 0 ||
+    filters.countries.length > 0 ||
     Object.values(filters.attributeFilters).some((v) => v.length > 0) ||
     filters.priceMin !== null ||
     filters.priceMax !== null ||
@@ -378,6 +411,24 @@ function CatalogContent() {
                     className={`chip ${filters.brands.includes(brand) ? "is-active" : ""}`}
                   >
                     {brand}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Country filter — oil and perfume only */}
+          {showCountryFilter && countryOptions.length > 0 && (
+            <div>
+              <h4 className="filter-title">Страна происхождения</h4>
+              <div className="filter-options">
+                {countryOptions.map((country) => (
+                  <button
+                    key={country}
+                    onClick={() => toggleCountry(country)}
+                    className={`chip ${filters.countries.includes(country) ? "is-active" : ""}`}
+                  >
+                    {country}
                   </button>
                 ))}
               </div>

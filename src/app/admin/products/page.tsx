@@ -8,6 +8,7 @@ import { useAdminRole } from "@/lib/adminRole";
 import { createClient } from "@/lib/supabase/client";
 import { formatPrice, CATEGORY_LABELS, UNIT_LABELS } from "@/lib/utils";
 import { Product, ProductCategory } from "@/types";
+import { COUNTRIES } from "@/lib/countries";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ interface FormState {
   count: string;
   is_featured: boolean;
   attributes: Record<string, string>;
+  country_of_origin: string;
 }
 
 const emptyProduct: FormState = {
@@ -37,6 +39,7 @@ const emptyProduct: FormState = {
   count: "",
   is_featured: false,
   attributes: {},
+  country_of_origin: "",
 };
 
 // ─── Category-specific attribute field configs ─────────────────────────────
@@ -47,7 +50,6 @@ const CATEGORY_ATTR_FIELDS: Record<ProductCategory, AttrField[]> = {
   oil: [
     { key: "oil_type",    label: "Тип масла",               placeholder: "базовое, эфирное, смесь..." },
     { key: "aroma_note",  label: "Нота / аромат",            placeholder: "роза, жасмин, мята..." },
-    { key: "country",     label: "Страна происхождения",     placeholder: "Болгария, Марокко..." },
   ],
   perfume: [
     { key: "gender",      label: "Пол",                      placeholder: "" },
@@ -210,6 +212,7 @@ export default function AdminProducts() {
       image_url: product.image_url || "",
       count: String(product.count ?? 0),
       is_featured: product.is_featured,
+      country_of_origin: product.country_of_origin ?? "",
       attributes: Object.fromEntries(
         Object.entries(product.attributes ?? {}).map(([k, v]) => [
           k,
@@ -285,6 +288,9 @@ export default function AdminProducts() {
         unit,
         min_volume: minVolume,
         attributes: attrs,
+        country_of_origin: (form.category !== "accessory" && form.country_of_origin)
+          ? form.country_of_origin
+          : null,
       };
 
       let saveError: string | null = null;
@@ -532,6 +538,24 @@ export default function AdminProducts() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Country of origin — oil and perfume only */}
+              {form.category !== "accessory" && (
+                <div className="form-group">
+                  <label htmlFor="product-country" className="form-label">Страна происхождения</label>
+                  <select
+                    id="product-country"
+                    value={form.country_of_origin}
+                    onChange={(e) => setForm((prev) => ({ ...prev, country_of_origin: e.target.value }))}
+                    className="input-dark"
+                  >
+                    <option value="">— не указана —</option>
+                    {COUNTRIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
               )}
 

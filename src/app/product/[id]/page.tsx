@@ -232,6 +232,14 @@ export default function ProductPage() {
                 )}
               </div>
 
+              {/* Country of origin */}
+              {product.country_of_origin && (
+                <div className="detail-row">
+                  <span>Страна происхождения</span>
+                  <strong>{product.country_of_origin}</strong>
+                </div>
+              )}
+
               {/* Render all product attributes */}
               {attributeEntries.map(([key, value]) => (
                 <div key={key} className="detail-row">
