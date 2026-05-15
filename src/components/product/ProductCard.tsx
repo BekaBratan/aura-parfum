@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ShoppingBag } from "lucide-react";
-import { formatPriceUsd, formatPricePerUnit, UNIT_LABELS } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice, UNIT_LABELS } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { Product } from "@/types";
@@ -48,7 +48,7 @@ export default function ProductCard({
       product_id: product.id,
       name: product.name,
       brand: product.brand,
-      price_usd: product.price_usd,
+      price_usd: priceUsd,
       volume_ml: product.volume_ml,
       image_url: product.image_url,
       count: productCount,
@@ -62,9 +62,10 @@ export default function ProductCard({
     ? `В наличии: ${productCount} ${UNIT_LABELS[product.unit ?? "pcs"]}`
     : "Нет в наличии";
 
+  const priceUsd = getProductPrice(product);
   const priceDisplay = isMl
-    ? formatPricePerUnit(product.price_usd, "ml", kztRate)
-    : formatPriceUsd(product.price_usd, kztRate);
+    ? formatPricePerUnit(priceUsd, "ml", kztRate)
+    : formatPriceUsd(priceUsd, kztRate);
 
   return (
     <Link

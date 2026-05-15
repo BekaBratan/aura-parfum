@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
-import { formatPriceUsd, formatPricePerUnit, UNIT_LABELS } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice, UNIT_LABELS } from "@/lib/utils";
 import { formatUsd } from "@/lib/currency";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
@@ -75,7 +75,7 @@ export default function ProductPage() {
       product_id: product.id,
       name: product.name,
       brand: product.brand,
-      price_usd: product.price_usd,
+      price_usd: priceUsd,
       volume_ml: isMl ? qty : product.volume_ml,
       image_url: product.image_url,
       count: productCount,
@@ -83,7 +83,7 @@ export default function ProductPage() {
       category: product.category ?? "accessory",
       quantity: qty,
     });
-    const totalKzt = formatPriceUsd(product.price_usd * qty, kztRate);
+    const totalKzt = formatPriceUsd(priceUsd * qty, kztRate);
     const label = isMl ? `${qty} мл → ${totalKzt}` : product.name;
     toast.success(`Добавлено: ${label}`);
   };
@@ -116,8 +116,9 @@ export default function ProductPage() {
     );
   }
 
+  const priceUsd = getProductPrice(product);
   const totalKzt = formatPriceUsd(
-    isMl ? product.price_usd * chosenVolume : product.price_usd,
+    isMl ? priceUsd * chosenVolume : priceUsd,
     kztRate
   );
   const availabilityText = isAvailable
@@ -173,13 +174,13 @@ export default function ProductPage() {
             <div className="detail-price-block">
               <p className="price detail-price">
                 {isMl
-                  ? formatPricePerUnit(product.price_usd, "ml", kztRate)
-                  : formatPriceUsd(product.price_usd, kztRate)}
+                  ? formatPricePerUnit(priceUsd, "ml", kztRate)
+                  : formatPriceUsd(priceUsd, kztRate)}
               </p>
               <p className="detail-price-usd">
                 {isMl
-                  ? `${formatUsd(product.price_usd)} / мл`
-                  : formatUsd(product.price_usd)}
+                  ? `${formatUsd(priceUsd)} / мл`
+                  : formatUsd(priceUsd)}
               </p>
             </div>
 

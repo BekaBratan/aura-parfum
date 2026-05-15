@@ -101,7 +101,8 @@ export const useCartStore = create<CartStore>()(
 
       clearCart: () => set({ items: [] }),
 
-      totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
+      // Count distinct product lines, not sum of quantities/ml
+      totalItems: () => get().items.length,
 
       totalUsd: () =>
         get().items.reduce((sum, i) => sum + i.price_usd * i.quantity, 0),

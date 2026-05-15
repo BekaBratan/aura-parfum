@@ -234,27 +234,42 @@ export default function CartPage() {
                   )}
                 </div>
 
-                <div className="quantity-control">
-                  <button
-                    onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                    className="icon-button"
-                    aria-label="Уменьшить"
-                  >
-                    <Minus size={14} />
-                  </button>
-                  <span className="quantity-value">
-                    {item.quantity}
-                    {item.unit === "ml" && <span className="quantity-unit"> мл</span>}
-                  </span>
-                  <button
-                    onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                    disabled={!canIncrement}
-                    className="icon-button"
-                    aria-label="Увеличить"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </div>
+                {item.unit === "ml" ? (
+                  <div className="cart-ml-input">
+                    <input
+                      type="number"
+                      min={1}
+                      max={availableCount || undefined}
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (!isNaN(v) && v >= 1) updateQuantity(item.product_id, v);
+                      }}
+                      className="input volume-input"
+                      aria-label="Объём, мл"
+                    />
+                    <span className="volume-unit">мл</span>
+                  </div>
+                ) : (
+                  <div className="quantity-control">
+                    <button
+                      onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                      className="icon-button"
+                      aria-label="Уменьшить"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span className="quantity-value">{item.quantity}</span>
+                    <button
+                      onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                      disabled={!canIncrement}
+                      className="icon-button"
+                      aria-label="Увеличить"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                )}
 
                 <div className="cart-line-total">
                   <p className="price">{formatPriceUsd(item.price_usd * item.quantity, kztRate)}</p>

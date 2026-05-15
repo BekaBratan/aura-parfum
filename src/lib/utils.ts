@@ -6,13 +6,27 @@ export function formatPrice(kztAmount: number): string {
   return formatKzt(kztAmount);
 }
 
-// Convert USD → KZT and format
-export function formatPriceUsd(priceUsd: number, kztRate: number): string {
-  return formatKzt(convertToKzt(priceUsd, kztRate));
+// Convert USD → KZT and format. Returns "—" if price is missing (migration pending).
+export function formatPriceUsd(priceUsd: number | undefined | null, kztRate: number): string {
+  const p = Number(priceUsd);
+  if (!isFinite(p) || p < 0) return "—";
+  return formatKzt(convertToKzt(p, kztRate || 1));
 }
 
-export function formatPricePerUnit(priceUsd: number, unit: ProductUnit, kztRate: number): string {
+export function formatPricePerUnit(
+  priceUsd: number | undefined | null,
+  unit: ProductUnit,
+  kztRate: number
+): string {
   return `${formatPriceUsd(priceUsd, kztRate)} / ${UNIT_LABELS[unit]}`;
+}
+
+// Read price from product safely — handles both price_usd (new) and price (legacy pre-migration)
+export function getProductPrice(product: { price_usd?: number | null; price?: number | null }): number {
+  const usd = Number(product.price_usd);
+  if (isFinite(usd) && usd > 0) return usd;
+  const legacy = Number((product as { price?: number }).price);
+  return isFinite(legacy) ? legacy : 0;
 }
 
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {

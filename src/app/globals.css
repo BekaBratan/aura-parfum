@@ -1231,6 +1231,16 @@ img {
   gap: 10px;
 }
 
+.cart-ml-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cart-ml-input .volume-input {
+  width: 80px;
+}
+
 .volume-input {
   width: 110px;
   text-align: center;
