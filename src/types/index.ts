@@ -73,4 +73,5 @@ export interface CurrencyRate {
   currency_code: string;
   rate_to_usd: number;
   updated_at: string;
+  is_manual: boolean;
 }

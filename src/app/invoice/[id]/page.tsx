@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import * as pdfMake from "pdfmake/build/pdfmake";
 import pdfFonts from "pdfmake/build/vfs_fonts";
 import type { TableCell, TDocumentDefinitions } from "pdfmake/interfaces";
-import { Download, Loader2, Send, ShoppingBag } from "lucide-react";
+import { Download, Loader2, Send, XCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
@@ -36,7 +36,7 @@ function formatKzt(price: number) {
     maximumFractionDigits: 0,
   }).format(Number(price) || 0);
 
-  return `${amount.replace(/\s/g, " ")} ₸`;
+  return `${amount.replace(/\s/g, " ")} тг`;
 }
 
 function formatInvoiceDate(value: string) {
@@ -102,7 +102,7 @@ function buildInvoicePdfDefinition(order: Order): TDocumentDefinitions {
       muted: { color: "#6f6a62" },
     },
     content: [
-      { text: "Aura Parfum", style: "brand" },
+      { text: "AZ-ZAHRA", style: "brand" },
       { text: `Накладная № ${order.invoice_number}`, style: "title" },
       {
         columns: [
@@ -173,7 +173,7 @@ function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string) {
   });
 
   return [
-    "Здравствуйте! Новый заказ Aura Parfum.",
+    "Здравствуйте! Новый заказ AZ-ZAHRA Parfume.",
     "",
     `Накладная № ${order.invoice_number}`,
     `Клиент: ${order.customer_name}`,
@@ -197,6 +197,7 @@ export default function InvoicePage() {
   const [loading, setLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState("");
   const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     async function loadOrder() {
@@ -269,6 +270,51 @@ export default function InvoicePage() {
     if (!result?.blob) return;
 
     downloadBlob(result.blob, getInvoicePdfFileName(order));
+  };
+
+  const cancelOrder = async () => {
+    if (!order) return;
+    if (order.order_status === "cancelled") {
+      toast.error("Заказ уже отменён");
+      return;
+    }
+    if (!window.confirm("Вы уверены, что хотите отменить заказ? Запас товаров будет восстановлен.")) return;
+
+    setCancelling(true);
+    const supabase = createClient();
+
+    try {
+      // Restore stock for each item
+      for (const item of order.items) {
+        const { data: product } = await supabase
+          .from("products")
+          .select("count")
+          .eq("id", item.product_id)
+          .single();
+
+        if (product) {
+          await supabase
+            .from("products")
+            .update({ count: Number(product.count) + item.quantity })
+            .eq("id", item.product_id);
+        }
+      }
+
+      // Mark order as cancelled
+      const { error } = await supabase
+        .from("orders")
+        .update({ order_status: "cancelled" })
+        .eq("id", order.id);
+
+      if (error) throw error;
+
+      setOrder((prev) => prev ? { ...prev, order_status: "cancelled" } : prev);
+      toast.success("Заказ отменён. Запас товаров восстановлен.");
+    } catch {
+      toast.error("Не удалось отменить заказ");
+    } finally {
+      setCancelling(false);
+    }
   };
 
   const sendToWhatsApp = async () => {
@@ -362,18 +408,39 @@ export default function InvoicePage() {
             </div>
 
             <div className="invoice-actions">
+              <button
+                onClick={sendToWhatsApp}
+                disabled={pdfGenerating}
+                className="btn"
+                style={{ background: "#25D366", color: "#fff", borderColor: "#25D366" }}
+              >
+                <Send size={17} />
+                Отправить в WhatsApp
+              </button>
+
               <button onClick={downloadPdf} disabled={pdfGenerating} className="btn btn-primary">
                 {pdfGenerating ? <Loader2 size={17} className="animate-spin" /> : <Download size={17} />}
                 {pdfGenerating ? "Готовим PDF..." : "Скачать PDF"}
               </button>
-              <button onClick={sendToWhatsApp} disabled={pdfGenerating} className="btn btn-secondary">
-                <Send size={17} />
-                Отправить в WhatsApp
-              </button>
-              <Link href="/catalog" className="btn btn-secondary">
-                <ShoppingBag size={17} />
-                Продолжить покупки
-              </Link>
+
+              {order.order_status !== "cancelled" && (
+                <button
+                  onClick={cancelOrder}
+                  disabled={cancelling}
+                  className="btn"
+                  style={{ background: "rgba(220,38,38,0.1)", color: "#f87171", border: "1px solid rgba(220,38,38,0.3)" }}
+                >
+                  {cancelling ? <Loader2 size={17} className="animate-spin" /> : <XCircle size={17} />}
+                  {cancelling ? "Отмена..." : "Отменить заказ"}
+                </button>
+              )}
+
+              {order.order_status === "cancelled" && (
+                <div className="btn" style={{ background: "rgba(220,38,38,0.08)", color: "#f87171", border: "1px solid rgba(220,38,38,0.2)", cursor: "default", opacity: 0.7 }}>
+                  <XCircle size={17} />
+                  Заказ отменён
+                </div>
+              )}
             </div>
           </aside>
         </div>

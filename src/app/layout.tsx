@@ -1,17 +1,16 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
-import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
 import CurrencyLoader from "@/components/layout/CurrencyLoader";
+import ConditionalLayout from "@/components/layout/ConditionalLayout";
 
 export const metadata: Metadata = {
   title: {
-    default: "Aura Parfum — Роскошные ароматы",
-    template: "%s | Aura Parfum",
+    default: "AZ-ZAHRA — Роскошные ароматы",
+    template: "%s | AZ-ZAHRA",
   },
   description:
-    "Откройте мир изысканных ароматов в Aura Parfum. Оригинальная парфюмерия от ведущих мировых брендов с доставкой по Казахстану.",
+    "Откройте мир изысканных ароматов в AZ-ZAHRA. Оригинальная парфюмерия от ведущих мировых брендов с доставкой по Казахстану.",
   keywords: ["парфюм", "духи", "ароматы", "Казахстан", "купить духи"],
 };
 
@@ -24,9 +23,7 @@ export default function RootLayout({
     <html lang="ru">
       <body className="site-shell">
         <CurrencyLoader />
-        <Navbar />
-        <main className="site-main">{children}</main>
-        <Footer />
+        <ConditionalLayout>{children}</ConditionalLayout>
         <Toaster
           position="top-right"
           toastOptions={{

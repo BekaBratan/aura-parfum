@@ -12,7 +12,7 @@ import {
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { CATEGORY_LABELS, CATEGORY_ORDER } from "@/lib/utils";
+import { CATEGORY_LABELS, CATEGORY_ORDER, GENDER_LABELS } from "@/lib/utils";
 
 type CatalogViewMode = "grid" | "list";
 
@@ -29,20 +29,15 @@ const CATEGORY_ATTRIBUTE_FILTERS: Record<
   ProductCategory,
   Array<{ key: string; label: string }>
 > = {
-  oil: [
-    { key: "oil_type", label: "Тип масла" },
-    { key: "aroma_note", label: "Аромат / нота" },
-  ],
-  perfume: [
-    { key: "gender", label: "Пол" },
-    { key: "family", label: "Семейство аромата" },
-  ],
+  oil: [],
+  perfume: [],
   accessory: [
     { key: "type", label: "Тип" },
-    { key: "material", label: "Материал" },
-    { key: "color", label: "Цвет" },
   ],
 };
+
+// Categories where the gender quick-filter row is shown
+const CATEGORIES_WITH_GENDER: ProductCategory[] = ["oil", "perfume"];
 
 // Categories where country filter is shown
 const CATEGORIES_WITH_COUNTRY: ProductCategory[] = ["oil", "perfume"];
@@ -170,6 +165,38 @@ function CatalogContent() {
     return opts;
   }, [categoryProducts, attrFilterConfig]);
 
+  // Gender quick-filter — only for oil and perfume
+  const showGenderFilter =
+    activeCategory !== null && CATEGORIES_WITH_GENDER.includes(activeCategory);
+
+  const genderOptions = useMemo(() => {
+    if (!showGenderFilter) return [];
+    const vals = new Set<string>();
+    for (const p of categoryProducts) {
+      // attributes.gender for new products, p.gender column as fallback
+      const g = (p.attributes?.["gender"] as string | undefined) ?? p.gender;
+      if (g) vals.add(g);
+    }
+    return ["men", "women", "unisex"].filter((g) => vals.has(g));
+  }, [categoryProducts, showGenderFilter]);
+
+  const activeGenders = filters.attributeFilters["gender"] ?? [];
+
+  const toggleGender = useCallback((val: string) => {
+    setFilters((prev) => {
+      const current = prev.attributeFilters["gender"] ?? [];
+      return {
+        ...prev,
+        attributeFilters: {
+          ...prev.attributeFilters,
+          gender: current.includes(val)
+            ? current.filter((v) => v !== val)
+            : [...current, val],
+        },
+      };
+    });
+  }, []);
+
   // Country filter options for oil and perfume
   const showCountryFilter =
     activeCategory !== null && CATEGORIES_WITH_COUNTRY.includes(activeCategory);
@@ -213,7 +240,10 @@ function CatalogContent() {
     Object.entries(filters.attributeFilters).forEach(([key, values]) => {
       if (!values.length) return;
       list = list.filter((p) => {
-        const val = p.attributes?.[key];
+        // For gender: check attributes first, fall back to top-level column
+        const val = key === "gender"
+          ? ((p.attributes?.["gender"] as string | undefined) ?? p.gender)
+          : p.attributes?.[key];
         if (!val) return false;
         if (typeof val === "string") return values.includes(val);
         if (Array.isArray(val)) return val.some((v) => values.includes(String(v)));
@@ -328,6 +358,30 @@ function CatalogContent() {
             </button>
           ))}
         </div>
+
+        {/* Gender quick-filter — above search, only for oil/perfume */}
+        {showGenderFilter && genderOptions.length > 0 && (
+          <div className="catalog-tabs catalog-gender-tabs" role="group" aria-label="Пол">
+            <button
+              className={`catalog-tab ${activeGenders.length === 0 ? "is-active" : ""}`}
+              onClick={() => setFilters((prev) => ({
+                ...prev,
+                attributeFilters: { ...prev.attributeFilters, gender: [] },
+              }))}
+            >
+              Все
+            </button>
+            {genderOptions.map((g) => (
+              <button
+                key={g}
+                className={`catalog-tab ${activeGenders.includes(g) ? "is-active" : ""}`}
+                onClick={() => toggleGender(g)}
+              >
+                {GENDER_LABELS[g] ?? g}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Controls: search + sort + view toggle + filters button */}
         <div className="catalog-controls">

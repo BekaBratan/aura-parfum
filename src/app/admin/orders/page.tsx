@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, Eye, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, Eye, Search, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
@@ -27,27 +27,64 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<Order | null>(null);
 
+  const [search, setSearch] = useState("");
+  const [filterOrderStatus, setFilterOrderStatus] = useState("all");
+  const [filterPayStatus, setFilterPayStatus] = useState("all");
+
   const loadOrders = useCallback(async () => {
     const supabase = createClient();
     const { data } = await supabase
       .from("orders")
       .select("*")
       .order("created_at", { ascending: false });
-
     setOrders((data as Order[]) || []);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void loadOrders();
-    }, 0);
-
+    const timeout = window.setTimeout(() => { void loadOrders(); }, 0);
     return () => window.clearTimeout(timeout);
   }, [loadOrders]);
 
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      if (filterOrderStatus !== "all" && o.order_status !== filterOrderStatus) return false;
+      if (filterPayStatus !== "all" && o.payment_status !== filterPayStatus) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (
+          !o.invoice_number.toLowerCase().includes(q) &&
+          !o.customer_name.toLowerCase().includes(q) &&
+          !o.customer_phone.includes(q)
+        ) return false;
+      }
+      return true;
+    });
+  }, [orders, search, filterOrderStatus, filterPayStatus]);
+
   const updateOrder = async (id: string, field: "payment_status" | "order_status", value: string) => {
     const supabase = createClient();
+
+    // Restore stock when cancelling an order
+    if (field === "order_status" && value === "cancelled") {
+      const order = orders.find((o) => o.id === id);
+      if (order && order.order_status !== "cancelled") {
+        for (const item of order.items) {
+          const { data: product } = await supabase
+            .from("products")
+            .select("count")
+            .eq("id", item.product_id)
+            .single();
+          if (product) {
+            await supabase
+              .from("products")
+              .update({ count: Number(product.count) + item.quantity })
+              .eq("id", item.product_id);
+          }
+        }
+      }
+    }
+
     const { error } = await supabase
       .from("orders")
       .update({ [field]: value })
@@ -58,25 +95,74 @@ export default function AdminOrders() {
       return;
     }
 
-    toast.success("Статус обновлен");
+    toast.success(
+      field === "order_status" && value === "cancelled"
+        ? "Заказ отменён. Запас товаров восстановлен."
+        : "Статус обновлён"
+    );
     setOrders((current) => current.map((order) => (order.id === id ? { ...order, [field]: value } : order)));
     if (detail?.id === id) {
       setDetail((current) => (current ? { ...current, [field]: value } : null));
     }
   };
 
+  const FilterChip = ({ value, active, onClick, children }: { value: string; active: boolean; onClick: () => void; children: React.ReactNode }) => (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${active ? "bg-[var(--gold)]/20 text-[var(--gold)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-white/5"}`}
+    >
+      {children}
+    </button>
+  );
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-6">Заказы</h1>
+      <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-4">Заказы</h1>
+
+      {/* Search + filters */}
+      <div className="space-y-2 mb-4">
+        <div className="relative">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск по счёту, имени или телефону..."
+            className="input-dark w-full pl-9 py-2 text-sm"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] cursor-pointer">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-xs text-[var(--text-secondary)] mr-1">Статус:</span>
+            <FilterChip value="all" active={filterOrderStatus === "all"} onClick={() => setFilterOrderStatus("all")}>Все</FilterChip>
+            {Object.entries(ORDER_STATUS_LABELS).map(([val, label]) => (
+              <FilterChip key={val} value={val} active={filterOrderStatus === val} onClick={() => setFilterOrderStatus(val)}>{label}</FilterChip>
+            ))}
+          </div>
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-xs text-[var(--text-secondary)] mr-1">Оплата:</span>
+            <FilterChip value="all" active={filterPayStatus === "all"} onClick={() => setFilterPayStatus("all")}>Все</FilterChip>
+            {Object.entries(PAYMENT_STATUS_LABELS).map(([val, label]) => (
+              <FilterChip key={val} value={val} active={filterPayStatus === val} onClick={() => setFilterPayStatus(val)}>{label}</FilterChip>
+            ))}
+          </div>
+          <span className="self-center text-xs text-[var(--text-secondary)]">{filteredOrders.length} из {orders.length}</span>
+        </div>
+      </div>
 
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 skeleton rounded-xl" />
-          ))}
+          {[1, 2, 3].map((i) => <div key={i} className="h-16 skeleton rounded-xl" />)}
         </div>
-      ) : orders.length === 0 ? (
-        <p className="text-[var(--text-secondary)] text-center py-12">Заказов пока нет</p>
+      ) : filteredOrders.length === 0 ? (
+        <p className="text-[var(--text-secondary)] text-center py-12">
+          {orders.length === 0 ? "Заказов пока нет" : "Ничего не найдено"}
+        </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -91,7 +177,7 @@ export default function AdminOrders() {
               </tr>
             </thead>
             <tbody>
-              {orders.map((order) => (
+              {filteredOrders.map((order) => (
                 <tr key={order.id} className="border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors">
                   <td className="py-3 pr-4">
                     <p className="text-[var(--text-primary)] font-medium">{order.invoice_number}</p>
@@ -171,12 +257,7 @@ export default function AdminOrders() {
   );
 }
 
-function StatusSelect({
-  value,
-  labels,
-  className,
-  onChange,
-}: {
+function StatusSelect({ value, labels, className, onChange }: {
   value: string;
   labels: Record<string, string>;
   className?: string;
@@ -190,9 +271,7 @@ function StatusSelect({
         className={`appearance-none text-xs px-3 py-1 pr-7 rounded-full cursor-pointer border-0 outline-none ${className || ""}`}
       >
         {Object.entries(labels).map(([optionValue, label]) => (
-          <option key={optionValue} value={optionValue}>
-            {label}
-          </option>
+          <option key={optionValue} value={optionValue}>{label}</option>
         ))}
       </select>
       <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />

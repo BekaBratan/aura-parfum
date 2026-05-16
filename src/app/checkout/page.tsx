@@ -121,8 +121,28 @@ export default function CheckoutPage() {
     );
   }
 
+  const formatPhone = (raw: string): string => {
+    // Keep only digits, strip leading 7/8
+    let digits = raw.replace(/\D/g, "");
+    if (digits.startsWith("7") || digits.startsWith("8")) digits = digits.slice(1);
+    digits = digits.slice(0, 10);
+
+    let result = "+7";
+    if (digits.length > 0) result += " (" + digits.slice(0, 3);
+    if (digits.length >= 3) result += ") " + digits.slice(3, 6);
+    if (digits.length >= 6) result += " " + digits.slice(6, 10);
+    return result;
+  };
+
+  const isPhoneValid = (phone: string) => phone.replace(/\D/g, "").length === 11;
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm((current) => ({ ...current, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    if (name === "customer_phone") {
+      setForm((current) => ({ ...current, customer_phone: formatPhone(value) }));
+      return;
+    }
+    setForm((current) => ({ ...current, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -130,6 +150,10 @@ export default function CheckoutPage() {
 
     if (!form.customer_name || !form.customer_phone || !form.customer_city || !form.customer_address) {
       toast.error("Заполните обязательные поля");
+      return;
+    }
+    if (!isPhoneValid(form.customer_phone)) {
+      toast.error("Введите корректный номер телефона: +7 (XXX) XXX XXXX");
       return;
     }
 
@@ -210,7 +234,6 @@ export default function CheckoutPage() {
           <form onSubmit={handleSubmit} className="card checkout-form">
             {[
               { name: "customer_name", label: "Имя *", placeholder: "Ваше имя", type: "text" },
-              { name: "customer_phone", label: "Телефон *", placeholder: "+7 (___) ___-__-__", type: "tel" },
               { name: "customer_city", label: "Город *", placeholder: "Алматы", type: "text" },
               { name: "customer_address", label: "Адрес доставки *", placeholder: "Улица, дом, квартира", type: "text" },
             ].map((field) => (
@@ -227,6 +250,24 @@ export default function CheckoutPage() {
                 />
               </label>
             ))}
+
+            <label className="form-field">
+              <span className="form-label">Телефон *</span>
+              <input
+                type="tel"
+                name="customer_phone"
+                value={form.customer_phone}
+                onChange={handleChange}
+                placeholder="+7 (777) 777 7777"
+                className={`input ${form.customer_phone && !isPhoneValid(form.customer_phone) ? "border-red-500/60" : ""}`}
+                required
+              />
+              {form.customer_phone && !isPhoneValid(form.customer_phone) && (
+                <span style={{ fontSize: "0.75rem", color: "#f87171", marginTop: 4, display: "block" }}>
+                  Введите номер полностью: +7 (XXX) XXX XXXX
+                </span>
+              )}
+            </label>
 
             <label className="form-field">
               <span className="form-label">Комментарий</span>

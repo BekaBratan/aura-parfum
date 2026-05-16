@@ -6,8 +6,9 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
-import { formatPriceUsd, formatPricePerUnit, getProductPrice, UNIT_LABELS } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice, UNIT_LABELS, GENDER_LABELS } from "@/lib/utils";
 import { formatUsd } from "@/lib/currency";
+import { COUNTRY_CODES } from "@/lib/countries";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { ShoppingBag, ArrowLeft, Check, X as XIcon } from "lucide-react";
@@ -15,16 +16,15 @@ import MlInput from "@/components/ui/MlInput";
 import toast from "react-hot-toast";
 
 const ATTRIBUTE_LABELS: Record<string, string> = {
-  gender: "Пол",
-  family: "Семейство",
-  oil_type: "Тип масла",
-  aroma_note: "Нота",
-  type: "Тип",
-  material: "Материал",
-  color: "Цвет",
-  top_notes: "Верхние ноты",
-  middle_notes: "Средние ноты",
-  base_notes: "Базовые ноты",
+  gender:  "Пол",
+  quality: "Качество",
+  type:    "Тип",
+};
+
+const ALLOWED_ATTRIBUTES: Record<string, string[]> = {
+  perfume:   ["gender", "quality"],
+  oil:       ["gender", "quality"],
+  accessory: ["type"],
 };
 
 export default function ProductPage() {
@@ -120,9 +120,26 @@ export default function ProductPage() {
     ? `В наличии: ${productCount} ${UNIT_LABELS[product.unit ?? "pcs"]}`
     : "Нет в наличии";
 
-  const attributeEntries = Object.entries(product.attributes ?? {}).filter(
-    ([, v]) => v !== "" && v !== null && v !== undefined
+  const allowedKeys = ALLOWED_ATTRIBUTES[product.category ?? "perfume"] ?? [];
+
+  // Build attribute entries; for gender fall back to top-level column for older products
+  const rawEntries = Object.entries(product.attributes ?? {}).filter(
+    ([k, v]) => allowedKeys.includes(k) && v !== "" && v !== null && v !== undefined
   );
+  const hasGenderAttr = rawEntries.some(([k]) => k === "gender");
+  const attributeEntries =
+    allowedKeys.includes("gender") && !hasGenderAttr && product.gender
+      ? [...rawEntries, ["gender", product.gender] as [string, string]]
+      : rawEntries;
+
+  const countryCode = product.country_of_origin
+    ? COUNTRY_CODES[product.country_of_origin] ?? null
+    : null;
+
+  const categoryLabel =
+    product.category === "oil" ? "Масло"
+    : product.category === "perfume" ? "Парфюм"
+    : null;
 
   return (
     <div className="product-detail">
@@ -148,7 +165,7 @@ export default function ProductPage() {
               <div className="image-placeholder">
                 <div>
                   <ShoppingBag size={74} strokeWidth={1} />
-                  <span>Aura Parfum</span>
+                  <span>AZ-ZAHRA</span>
                 </div>
               </div>
             )}
@@ -157,12 +174,63 @@ export default function ProductPage() {
                 Хит продаж
               </span>
             )}
+            {countryCode && (
+              <div className="product-detail-country" title={product.country_of_origin ?? ""}>
+                {countryCode}
+              </div>
+            )}
           </div>
 
           <div className="detail-panel">
+            {/* Brand, name, category */}
             <div>
               <p className="product-brand">{product.brand}</p>
               <h1 className="detail-title">{product.name}</h1>
+              {categoryLabel && (
+                <p className="product-category-label" style={{ marginTop: 6 }}>{categoryLabel}</p>
+              )}
+            </div>
+
+            {product.description && (
+              <p className="detail-description">{product.description}</p>
+            )}
+
+            <div className="card detail-list">
+              <div className="detail-row">
+                <span>Наличие</span>
+                {isAvailable ? (
+                  <strong className="product-availability">
+                    <Check size={14} /> {availabilityText}
+                  </strong>
+                ) : (
+                  <strong className="product-availability is-empty">
+                    <XIcon size={14} /> Нет в наличии
+                  </strong>
+                )}
+              </div>
+
+              {product.country_of_origin && (
+                <div className="detail-row">
+                  <span>Страна происхождения</span>
+                  <strong>
+                    {product.country_of_origin}
+                    {countryCode && (
+                      <span className="detail-country-code">{countryCode}</span>
+                    )}
+                  </strong>
+                </div>
+              )}
+
+              {attributeEntries.map(([key, value]) => {
+                const raw = Array.isArray(value) ? value.join(", ") : String(value);
+                const display = key === "gender" ? (GENDER_LABELS[raw] ?? raw) : raw;
+                return (
+                  <div key={key} className="detail-row">
+                    <span>{ATTRIBUTE_LABELS[key] ?? key}</span>
+                    <strong>{display}</strong>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Price */}
@@ -205,41 +273,6 @@ export default function ProductPage() {
                 </div>
               </div>
             )}
-
-            {product.description && (
-              <p className="detail-description">{product.description}</p>
-            )}
-
-            <div className="card detail-list">
-              <div className="detail-row">
-                <span>Наличие</span>
-                {isAvailable ? (
-                  <strong className="product-availability">
-                    <Check size={14} /> {availabilityText}
-                  </strong>
-                ) : (
-                  <strong className="product-availability is-empty">
-                    <XIcon size={14} /> Нет в наличии
-                  </strong>
-                )}
-              </div>
-
-              {product.country_of_origin && (
-                <div className="detail-row">
-                  <span>Страна происхождения</span>
-                  <strong>{product.country_of_origin}</strong>
-                </div>
-              )}
-
-              {attributeEntries.map(([key, value]) => (
-                <div key={key} className="detail-row">
-                  <span>{ATTRIBUTE_LABELS[key] ?? key}</span>
-                  <strong>
-                    {Array.isArray(value) ? value.join(", ") : String(value)}
-                  </strong>
-                </div>
-              ))}
-            </div>
 
             <button
               onClick={handleAdd}

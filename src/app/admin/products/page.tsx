@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ImageIcon, Loader2, Pencil, Plus, Save, Trash2, Upload, X } from "lucide-react";
+import { ImageIcon, Loader2, Pencil, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAdminRole } from "@/lib/adminRole";
 import { createClient } from "@/lib/supabase/client";
@@ -50,17 +50,15 @@ type AttrField = { key: string; label: string; placeholder: string };
 
 const CATEGORY_ATTR_FIELDS: Record<ProductCategory, AttrField[]> = {
   oil: [
-    { key: "oil_type",    label: "Тип масла",               placeholder: "базовое, эфирное, смесь..." },
-    { key: "aroma_note",  label: "Нота / аромат",            placeholder: "роза, жасмин, мята..." },
+    { key: "gender",  label: "Пол",      placeholder: "" },
+    { key: "quality", label: "Качество", placeholder: "" },
   ],
   perfume: [
-    { key: "gender",      label: "Пол",                      placeholder: "" },
-    { key: "family",      label: "Семейство аромата",        placeholder: "цветочный, восточный, древесный..." },
+    { key: "gender",  label: "Пол",      placeholder: "" },
+    { key: "quality", label: "Качество", placeholder: "" },
   ],
   accessory: [
-    { key: "type",        label: "Тип аксессуара",           placeholder: "флакон, воронка, браслет..." },
-    { key: "material",    label: "Материал",                 placeholder: "стекло, металл, силикон..." },
-    { key: "color",       label: "Цвет",                     placeholder: "прозрачный, золотой, чёрный..." },
+    { key: "type", label: "Тип аксессуара", placeholder: "флакон, воронка, браслет..." },
   ],
 };
 
@@ -68,6 +66,12 @@ const GENDER_OPTIONS = [
   { value: "unisex", label: "Унисекс" },
   { value: "men",    label: "Мужской" },
   { value: "women",  label: "Женский" },
+];
+
+const QUALITY_OPTIONS = [
+  { value: "", label: "— не указано —" },
+  { value: "De Luxe",  label: "De Luxe" },
+  { value: "Premium",  label: "Premium" },
 ];
 
 // ─── Image helpers ─────────────────────────────────────────────────────────
@@ -167,6 +171,24 @@ export default function AdminProducts() {
   const [previewImageError, setPreviewImageError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // ─── Filter state ──────────────────────────────────────────────────────────
+  const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState<ProductCategory | "all">("all");
+  const [filterStock, setFilterStock] = useState<"all" | "in" | "out">("all");
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((p) => {
+      if (filterCategory !== "all" && p.category !== filterCategory) return false;
+      if (filterStock === "in" && Number(p.count ?? 0) === 0) return false;
+      if (filterStock === "out" && Number(p.count ?? 0) > 0) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (!p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [products, search, filterCategory, filterStock]);
+
   const supabase = createClient();
   const imagePreviewSrc = selectedImagePreviewUrl || form.image_url.trim();
   const isMl = form.category !== "accessory";
@@ -208,11 +230,14 @@ export default function AdminProducts() {
   const openEdit = (product: Product) => {
     if (!isAdmin) return;
     setEditId(product.id);
+    const isAccessory = (product.category ?? "perfume") === "accessory";
     setForm({
       name: product.name,
       brand: product.brand,
       description: product.description || "",
-      price: String(product.price_usd ?? ""),
+      price: isAccessory
+        ? String(Math.round(Number(product.price_usd) * kztRate))
+        : String(product.price_usd ?? ""),
       category: product.category ?? "perfume",
       volume_ml: product.volume_ml === null ? "" : String(product.volume_ml),
       min_volume: product.min_volume === null ? "" : String(product.min_volume),
@@ -247,8 +272,12 @@ export default function AdminProducts() {
 
     if (!form.name || !form.brand) { toast.error("Заполните название и бренд"); return; }
     if (form.price === "") { toast.error("Укажите цену товара"); return; }
-    const price = Number(form.price);
-    if (price <= 0) { toast.error("Цена должна быть больше 0"); return; }
+    const priceInput = Number(form.price);
+    if (priceInput <= 0) { toast.error("Цена должна быть больше 0"); return; }
+    // For accessories price is entered in KZT — convert to USD for storage
+    const price = form.category === "accessory"
+      ? priceInput / (kztRate || 1)
+      : priceInput;
     if (form.count === "") { toast.error("Укажите количество товара"); return; }
     const count = Math.floor(Number(form.count));
     if (count < 0) { toast.error("Количество не может быть отрицательным"); return; }
@@ -276,8 +305,8 @@ export default function AdminProducts() {
         if (val) attrs[key] = val;
       }
 
-      // Derive gender for DB column (for perfumes from attributes, else unisex)
-      const genderVal = form.category === "perfume"
+      // Derive gender for DB column — oil and perfume both use gender attribute
+      const genderVal = (form.category === "perfume" || form.category === "oil")
         ? ((form.attributes["gender"] ?? "unisex") as "men" | "women" | "unisex")
         : "unisex";
 
@@ -367,7 +396,12 @@ export default function AdminProducts() {
       return;
     }
     if (name === "price") {
-      setForm((prev) => ({ ...prev, price: normalizeDecimalInput(value) }));
+      setForm((prev) => ({
+        ...prev,
+        price: prev.category === "accessory"
+          ? normalizeIntInput(value)
+          : normalizeDecimalInput(value),
+      }));
       return;
     }
     if (["volume_ml", "count", "min_volume"].includes(name)) {
@@ -375,8 +409,7 @@ export default function AdminProducts() {
       return;
     }
     if (name === "category") {
-      // Reset category-specific attributes when switching category
-      setForm((prev) => ({ ...prev, category: value as ProductCategory, attributes: {} }));
+      setForm((prev) => ({ ...prev, category: value as ProductCategory, attributes: {}, price: "" }));
       return;
     }
     setForm((prev) => ({ ...prev, [name]: value }));
@@ -398,14 +431,15 @@ export default function AdminProducts() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  const priceLabel = isMl ? "Цена, $/мл" : "Цена, $/шт.";
+  const isAccessory = form.category === "accessory";
+  const priceLabel = isAccessory ? "Цена, ₸" : isMl ? "Цена, $/мл" : "Цена, $";
   const countLabel = isMl ? "Запас, мл" : "Остаток, шт.";
   const countHelp = isMl ? "Общий запас в мл" : "Если товара нет, поставьте 0";
   const attrFields = CATEGORY_ATTR_FIELDS[form.category];
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Товары</h1>
         {isAdmin && (
           <button onClick={openNew} className="btn-gold px-4 py-2 rounded-lg text-sm flex items-center gap-2 cursor-pointer">
@@ -415,10 +449,40 @@ export default function AdminProducts() {
         )}
       </div>
 
+      {/* Search + filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Поиск по названию или бренду..."
+            className="input-dark w-full pl-9 py-2 text-sm"
+          />
+        </div>
+        <div className="flex gap-1">
+          {([["all", "Все"], ["oil", "Масла"], ["perfume", "Парфюм"], ["accessory", "Аксессуары"]] as const).map(([val, label]) => (
+            <button key={val} onClick={() => setFilterCategory(val)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${filterCategory === val ? "bg-[var(--gold)]/20 text-[var(--gold)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-white/5"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1">
+          {([["all", "Все"], ["in", "В наличии"], ["out", "Нет в наличии"]] as const).map(([val, label]) => (
+            <button key={val} onClick={() => setFilterStock(val)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${filterStock === val ? "bg-[var(--gold)]/20 text-[var(--gold)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-white/5"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="self-center text-xs text-[var(--text-secondary)] ml-1">{filteredProducts.length} товаров</span>
+      </div>
+
       {loading ? (
         <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="h-16 skeleton rounded-xl" />)}</div>
-      ) : products.length === 0 ? (
-        <p className="text-[var(--text-secondary)] text-center py-12">Нет товаров</p>
+      ) : filteredProducts.length === 0 ? (
+        <p className="text-[var(--text-secondary)] text-center py-12">{products.length === 0 ? "Нет товаров" : "Ничего не найдено"}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -434,7 +498,7 @@ export default function AdminProducts() {
               </tr>
             </thead>
             <tbody>
-              {products.map((product) => {
+              {filteredProducts.map((product) => {
                 const productCount = Number(product.count ?? 0);
                 const isAvailable = productCount > 0;
                 const unit = product.unit ?? "pcs";
@@ -514,8 +578,17 @@ export default function AdminProducts() {
               <div className="form-grid">
                 <div className="form-group">
                   <label htmlFor="product-price" className="form-label">{priceLabel}</label>
-                  <input id="product-price" name="price" type="text" inputMode="decimal" value={form.price} onChange={handleChange} placeholder={isMl ? "Например: 2.50" : "Например: 5.00"} className="input-dark" />
-                  {form.price && Number(form.price) > 0 && (
+                  <input
+                    id="product-price"
+                    name="price"
+                    type="text"
+                    inputMode={isAccessory ? "numeric" : "decimal"}
+                    value={form.price}
+                    onChange={handleChange}
+                    placeholder={isAccessory ? "Например: 3500" : isMl ? "Например: 2.50" : "Например: 5.00"}
+                    className="input-dark"
+                  />
+                  {!isAccessory && form.price && Number(form.price) > 0 && (
                     <p className="form-help" style={{ color: "var(--gold)" }}>
                       ≈ {formatKzt(convertToKzt(Number(form.price), kztRate))}{isMl ? " / мл" : ""}
                     </p>
@@ -565,6 +638,17 @@ export default function AdminProducts() {
                               <option key={o.value} value={o.value}>{o.label}</option>
                             ))}
                           </select>
+                        ) : key === "quality" ? (
+                          <select
+                            id={`attr-${key}`}
+                            value={form.attributes[key] ?? ""}
+                            onChange={(e) => handleAttrChange(key, e.target.value)}
+                            className="input-dark"
+                          >
+                            {QUALITY_OPTIONS.map((o) => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
                         ) : (
                           <input
                             id={`attr-${key}`}
@@ -610,7 +694,7 @@ export default function AdminProducts() {
                     <div className="absolute inset-0 grid place-items-center text-center text-[var(--gold-dark)]">
                       <div>
                         <ImageIcon size={42} strokeWidth={1.2} className="mx-auto" />
-                        <span className="mt-2 block text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">Aura Parfum</span>
+                        <span className="mt-2 block text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">AZ-ZAHRA</span>
                       </div>
                     </div>
                   )}

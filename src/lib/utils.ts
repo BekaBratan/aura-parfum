@@ -40,6 +40,12 @@ export const UNIT_LABELS: Record<ProductUnit, string> = {
   pcs: "шт.",
 };
 
+export const GENDER_LABELS: Record<string, string> = {
+  men: "Мужской",
+  women: "Женский",
+  unisex: "Унисекс",
+};
+
 export const CATEGORY_ORDER: ProductCategory[] = ["oil", "perfume", "accessory"];
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {
@@ -78,7 +84,7 @@ export function buildWhatsAppMessage(
   paymentStatus = "pending_payment"
 ): string {
   const lines = [
-    "*Aura Parfum invoice*",
+    "*AZ-ZAHRA invoice*",
     `Invoice: ${invoiceNumber}`,
     `Payment status: ${PAYMENT_STATUS_LABELS[paymentStatus] || paymentStatus}`,
     "",

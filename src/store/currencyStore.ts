@@ -6,6 +6,7 @@ import { CurrencyRate } from "@/types";
 interface CurrencyStore {
   kztRate: number;
   kztUpdatedAt: string | null;
+  kztIsManual: boolean;
   loading: boolean;
   fetchRates: () => Promise<void>;
 }
@@ -13,6 +14,7 @@ interface CurrencyStore {
 export const useCurrencyStore = create<CurrencyStore>((set) => ({
   kztRate: DEFAULT_KZT_RATE,
   kztUpdatedAt: null,
+  kztIsManual: false,
   loading: false,
 
   fetchRates: async () => {
@@ -31,6 +33,7 @@ export const useCurrencyStore = create<CurrencyStore>((set) => ({
           set({
             kztRate: Number(kzt.rate_to_usd),
             kztUpdatedAt: kzt.updated_at,
+            kztIsManual: kzt.is_manual ?? false,
           });
         }
       }

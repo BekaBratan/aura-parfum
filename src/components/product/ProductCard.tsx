@@ -9,6 +9,7 @@ import { useCurrencyStore } from "@/store/currencyStore";
 import { Product } from "@/types";
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
+import { COUNTRY_CODES } from "@/lib/countries";
 
 type ProductCardVariant = "grid" | "list";
 
@@ -67,6 +68,15 @@ export default function ProductCard({
     ? formatPricePerUnit(priceUsd, "ml", kztRate)
     : formatPriceUsd(priceUsd, kztRate);
 
+  const countryCode = product.country_of_origin
+    ? COUNTRY_CODES[product.country_of_origin] ?? null
+    : null;
+
+  const categoryLabel =
+    product.category === "oil" ? "Масло"
+    : product.category === "perfume" ? "Парфюм"
+    : null;
+
   return (
     <Link
       href={`/product/${product.id}`}
@@ -97,7 +107,7 @@ export default function ProductCard({
             <div className="image-placeholder">
               <div>
                 <ShoppingBag size={42} strokeWidth={1.2} />
-                <span>Aura Parfum</span>
+                <span>AZ-ZAHRA</span>
               </div>
             </div>
           )}
@@ -108,6 +118,12 @@ export default function ProductCard({
               <span className="badge badge-danger">Нет в наличии</span>
             )}
           </div>
+
+          {countryCode && (
+            <div className="product-card-country" title={product.country_of_origin ?? ""}>
+              {countryCode}
+            </div>
+          )}
 
           {isAvailable && !isList && !isMl && (
             <button
@@ -126,6 +142,9 @@ export default function ProductCard({
               <div className="product-list-main">
                 <p className="product-brand">{product.brand}</p>
                 <h3 className="product-title">{product.name}</h3>
+                {categoryLabel && (
+                  <p className="product-category-label">{categoryLabel}</p>
+                )}
               </div>
               <div className="product-list-meta">
                 <span className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
@@ -164,6 +183,9 @@ export default function ProductCard({
           <div className="product-card-body">
             <p className="product-brand">{product.brand}</p>
             <h3 className="product-title">{product.name}</h3>
+            {categoryLabel && (
+              <p className="product-category-label">{categoryLabel}</p>
+            )}
             <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
               {availabilityText}
             </p>

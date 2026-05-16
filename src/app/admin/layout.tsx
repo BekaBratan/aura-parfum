@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AdminRoleProvider, StaffRole } from "@/lib/adminRole";
-import { LayoutDashboard, Package, ShoppingCart, LogOut, Menu, X, Users, DollarSign } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, LogOut, Menu, X, Users, DollarSign, ExternalLink } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -80,40 +80,52 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AdminRoleProvider role={staffRole}>
-      <div className="min-h-screen flex">
-        {sideOpen && <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSideOpen(false)} />}
+      {/* Mobile overlay */}
+      {sideOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSideOpen(false)} />
+      )}
 
-        <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[var(--dark-2)] border-r border-[var(--border)] flex flex-col transition-transform duration-300 ${sideOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-          <div className="p-6 flex items-center justify-between">
-            <Link href="/admin" className="text-xl font-bold text-gold-gradient" style={{ fontFamily: "'Playfair Display', serif" }}>AZ-ZAHRA Admin</Link>
-            <button onClick={() => setSideOpen(false)} className="lg:hidden text-[var(--text-secondary)] cursor-pointer"><X size={20} /></button>
-          </div>
-          <nav className="flex-1 px-4 space-y-1">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors ${pathname === link.href ? "bg-[var(--gold)]/10 text-[var(--gold)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5"}`}
-              >
-                <link.icon size={18} /> {link.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="p-4 border-t border-[var(--border)]">
-            <p className="px-4 pb-2 text-xs text-[var(--text-secondary)]">{roleLabel}</p>
-            <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer w-full px-4 py-2">
-              <LogOut size={18} /> Выйти
-            </button>
-          </div>
-        </aside>
-
-        <div className="flex-1 min-w-0">
-          <header className="h-16 border-b border-[var(--border)] bg-[var(--dark-2)] flex items-center px-4 lg:px-8 gap-4">
-            <button onClick={() => setSideOpen(true)} className="lg:hidden text-[var(--text-secondary)] cursor-pointer"><Menu size={22} /></button>
-            <h2 className="text-sm font-medium text-[var(--text-primary)]">Панель управления · {roleLabel}</h2>
-          </header>
-          <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+      {/* Sidebar — always fixed, independent scroll */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[var(--dark-2)] border-r border-[var(--border)] flex flex-col transition-transform duration-300 ${sideOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+        <div className="p-6 flex items-center justify-between shrink-0">
+          <Link href="/admin" className="text-xl font-bold text-gold-gradient" style={{ fontFamily: "'Playfair Display', serif" }}>AZ-ZAHRA Admin</Link>
+          <button onClick={() => setSideOpen(false)} className="lg:hidden text-[var(--text-secondary)] cursor-pointer"><X size={20} /></button>
         </div>
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
+          {links.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setSideOpen(false)}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors ${pathname === link.href ? "bg-[var(--gold)]/10 text-[var(--gold)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5"}`}
+            >
+              <link.icon size={18} /> {link.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="p-4 border-t border-[var(--border)] shrink-0">
+          <p className="px-4 pb-2 text-xs text-[var(--text-secondary)]">{roleLabel}</p>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors w-full px-4 py-2 mb-1"
+          >
+            <ExternalLink size={18} /> Главная страница
+          </a>
+          <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer w-full px-4 py-2">
+            <LogOut size={18} /> Выйти
+          </button>
+        </div>
+      </aside>
+
+      {/* Main content — offset by sidebar width on desktop */}
+      <div className="lg:pl-64 min-h-screen flex flex-col">
+        <header className="h-16 border-b border-[var(--border)] bg-[var(--dark-2)] flex items-center px-4 lg:px-8 gap-4 sticky top-0 z-30">
+          <button onClick={() => setSideOpen(true)} className="lg:hidden text-[var(--text-secondary)] cursor-pointer"><Menu size={22} /></button>
+          <h2 className="text-sm font-medium text-[var(--text-primary)]">Панель управления · {roleLabel}</h2>
+        </header>
+        <div className="flex-1 p-4 sm:p-6 lg:p-8">{children}</div>
       </div>
     </AdminRoleProvider>
   );

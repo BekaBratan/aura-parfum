@@ -9,7 +9,7 @@ export default function Footer() {
       <div className="site-container">
         <div className="site-footer-grid">
           <div className="site-footer-brand">
-            <h3>AURA Parfum</h3>
+            <h3>AZ-ZAHRA</h3>
             <p>
               Мир изысканных ароматов. Оригинальная парфюмерия от ведущих
               мировых брендов с доставкой по Казахстану.
@@ -40,7 +40,7 @@ export default function Footer() {
         </div>
 
         <p className="site-footer-copy">
-          © {new Date().getFullYear()} Aura Parfum. Все права защищены.
+          © {new Date().getFullYear()} AZ-ZAHRA. Все права защищены.
         </p>
       </div>
     </footer>
