@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/utils";
+import { useCurrencyStore } from "@/store/currencyStore";
 
 pdfMake.addVirtualFileSystem(pdfFonts);
 
@@ -57,8 +58,16 @@ function getInvoicePdfPath(order: Order) {
   return `invoices/${order.invoice_number}.pdf`;
 }
 
+function getCategoryLabel(item: Order["items"][number]): string {
+  if (item.category === "oil")       return "Масло";
+  if (item.category === "perfume")   return "Парфюм";
+  if (item.category === "accessory") return "Аксессуар";
+  return "";
+}
+
 function getProductLine(item: Order["items"][number]) {
-  return `${item.brand} ${item.name}`;
+  const cat = getCategoryLabel(item);
+  return cat ? `[${cat}] ${item.name}` : item.name;
 }
 
 function getQtyLabel(item: Order["items"][number]) {
@@ -66,13 +75,24 @@ function getQtyLabel(item: Order["items"][number]) {
   return unit === "ml" ? `${item.quantity} мл` : `${item.quantity} шт.`;
 }
 
-function buildInvoicePdfDefinition(order: Order): TDocumentDefinitions {
-  const productRows: TableCell[][] = order.items.map((item) => [
-    { text: getProductLine(item) },
-    { text: getQtyLabel(item), alignment: "center" },
-    { text: formatKzt(item.price_usd), alignment: "right" },
-    { text: formatKzt(item.price_usd * item.quantity), alignment: "right" },
-  ]);
+// price_usd in order items: accessories = raw KZT, oils/perfumes = USD per ml
+// (the RPC stores prices from products table directly)
+function itemKzt(item: Order["items"][number], kztRate: number): number {
+  return item.category === "accessory"
+    ? item.price_usd
+    : item.price_usd * kztRate;
+}
+
+function buildInvoicePdfDefinition(order: Order, kztRate: number): TDocumentDefinitions {
+  const productRows: TableCell[][] = order.items.map((item) => {
+    const priceKzt = itemKzt(item, kztRate);
+    return [
+      { text: getProductLine(item) },
+      { text: getQtyLabel(item), alignment: "center" },
+      { text: formatKzt(priceKzt), alignment: "right" },
+      { text: formatKzt(priceKzt * item.quantity), alignment: "right" },
+    ];
+  });
 
   const customerRows: [string, string][] = [
     ["Имя", order.customer_name],
@@ -144,13 +164,13 @@ function buildInvoicePdfDefinition(order: Order): TDocumentDefinitions {
         },
         layout: "lightHorizontalLines",
       },
-      { text: `Итого: ${formatKzt(order.total_display_currency ?? order.total_usd)}`, style: "total" },
+      { text: `Итого: ${formatKzt(order.items.reduce((s, i) => s + itemKzt(i, kztRate) * i.quantity, 0))}`, style: "total" },
     ],
   };
 }
 
-async function createInvoicePdfBlob(order: Order) {
-  return pdfMake.createPdf(buildInvoicePdfDefinition(order)).getBlob();
+async function createInvoicePdfBlob(order: Order, kztRate: number) {
+  return pdfMake.createPdf(buildInvoicePdfDefinition(order, kztRate)).getBlob();
 }
 
 function downloadBlob(blob: Blob, fileName: string) {
@@ -164,12 +184,12 @@ function downloadBlob(blob: Blob, fileName: string) {
   URL.revokeObjectURL(url);
 }
 
-function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string) {
+function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string, kztRate: number) {
   const productLines = order.items.map((item, index) => {
     const product = getProductLine(item);
     const qty = getQtyLabel(item);
-    const lineTotal = item.price_usd * item.quantity;
-    return `${index + 1}. ${product} - ${qty} × ${formatKzt(item.price_usd)} = ${formatKzt(lineTotal)}`;
+    const priceKzt = itemKzt(item, kztRate);
+    return `${index + 1}. ${product} - ${qty} × ${formatKzt(priceKzt)} = ${formatKzt(priceKzt * item.quantity)}`;
   });
 
   return [
@@ -183,7 +203,7 @@ function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string) {
     "Товары:",
     ...productLines,
     "",
-    `Итого: ${formatKzt(order.total_display_currency ?? order.total_usd)}`,
+    `Итого: ${formatKzt(order.items.reduce((s, i) => s + itemKzt(i, kztRate) * i.quantity, 0))}`,
     `Статус оплаты: ${PDF_PAYMENT_STATUS_LABELS[order.payment_status]}`,
     "",
     "PDF-накладная:",
@@ -198,6 +218,7 @@ export default function InvoicePage() {
   const [pdfUrl, setPdfUrl] = useState("");
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const kztRate = useCurrencyStore((s) => s.kztRate);
 
   useEffect(() => {
     async function loadOrder() {
@@ -223,7 +244,7 @@ export default function InvoicePage() {
       setPdfGenerating(true);
 
       try {
-        const blob = await createInvoicePdfBlob(order);
+        const blob = await createInvoicePdfBlob(order, kztRate);
         const supabase = createClient();
         const path = getInvoicePdfPath(order);
         const { error: uploadError } = await supabase.storage
@@ -329,7 +350,7 @@ export default function InvoicePage() {
     }
 
     const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
-    const message = encodeURIComponent(buildInvoiceWhatsAppText(order, publicPdfUrl));
+    const message = encodeURIComponent(buildInvoiceWhatsAppText(order, publicPdfUrl, kztRate));
     window.open(`https://wa.me/${number}?text=${message}`, "_blank", "noopener,noreferrer");
   };
 
@@ -379,21 +400,26 @@ export default function InvoicePage() {
           <div className="card invoice-card">
             <h2 className="filter-title">Товары</h2>
             <div className="invoice-items">
-              {order.items.map((item, index) => (
-                <div key={`${item.product_id}-${index}`} className="invoice-item">
-                  <div>
-                    <p className="product-title">{item.brand} {item.name}</p>
-                    <p className="product-meta">
-                      {getQtyLabel(item)} × {formatKzt(item.price_usd)}
-                    </p>
+              {order.items.map((item, index) => {
+                const priceKzt = itemKzt(item, kztRate);
+                return (
+                  <div key={`${item.product_id}-${index}`} className="invoice-item">
+                    <div>
+                      <p className="product-title">{item.name}</p>
+                      <p className="product-meta">
+                        {getCategoryLabel(item)} · {getQtyLabel(item)} × {formatKzt(priceKzt)}
+                      </p>
+                    </div>
+                    <strong>{formatKzt(priceKzt * item.quantity)}</strong>
                   </div>
-                  <strong>{formatKzt(item.price_usd * item.quantity)}</strong>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="summary-row order-total-row">
               <span>Итого</span>
-              <span className="summary-total">{formatKzt(order.total_display_currency ?? order.total_usd)}</span>
+              <span className="summary-total">
+                {formatKzt(order.items.reduce((s, i) => s + itemKzt(i, kztRate) * i.quantity, 0))}
+              </span>
             </div>
           </div>
 

@@ -191,32 +191,32 @@ export default function ProductCard({
                 <p className="price">{priceDisplay}</p>
               </div>
               {isMl && isInCart ? (
-                <Link
-                  href="/cart"
-                  onClick={(e) => e.stopPropagation()}
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push("/cart"); }}
                   className="btn product-card-action-button product-card-in-cart-btn"
                 >
                   <Check size={16} />
                   В корзине
-                </Link>
+                </button>
               ) : isMl ? (
-                <Link
-                  href={`/product/${product.id}`}
-                  onClick={(e) => e.stopPropagation()}
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/product/${product.id}`); }}
+                  disabled={!isAvailable}
                   className={`btn btn-primary product-card-action-button ${!isAvailable ? "is-disabled" : ""}`}
-                  aria-disabled={!isAvailable}
                 >
                   Выбрать объём
-                </Link>
+                </button>
               ) : isInCart ? (
-                <Link
-                  href="/cart"
-                  onClick={(e) => e.stopPropagation()}
+                <button
+                  type="button"
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push("/cart"); }}
                   className="btn product-card-action-button product-card-in-cart-btn"
                 >
                   <Check size={16} />
                   В корзине
-                </Link>
+                </button>
               ) : (
                 <button
                   type="button"

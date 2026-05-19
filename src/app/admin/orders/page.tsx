@@ -6,6 +6,8 @@ import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
 import { formatPrice, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/utils";
+import { useCurrencyStore } from "@/store/currencyStore";
+import { OrderItem } from "@/types";
 
 const ORDER_STATUS_CLASSES: Record<string, string> = {
   new: "bg-blue-500/10 text-blue-400",
@@ -22,7 +24,17 @@ const PAYMENT_STATUS_CLASSES: Record<string, string> = {
   refunded: "bg-purple-500/10 text-purple-400",
 };
 
+// accessories store raw KZT in price_usd; oils/perfumes store USD
+function itemKzt(item: OrderItem, kztRate: number): number {
+  return item.category === "accessory" ? item.price_usd : item.price_usd * kztRate;
+}
+
+function orderTotalKzt(items: OrderItem[], kztRate: number): number {
+  return items.reduce((sum, i) => sum + itemKzt(i, kztRate) * i.quantity, 0);
+}
+
 export default function AdminOrders() {
+  const kztRate = useCurrencyStore((s) => s.kztRate);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<Order | null>(null);
@@ -200,7 +212,7 @@ export default function AdminOrders() {
                     <p className="text-xs text-[var(--text-secondary)]">{order.customer_name}</p>
                   </td>
                   <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{order.customer_phone}</td>
-                  <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">{formatPrice(order.total_display_currency ?? order.total_usd)}</td>
+                  <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">{formatPrice(orderTotalKzt(order.items, kztRate))}</td>
                   <td className="py-3 pr-4">
                     <StatusSelect
                       value={order.payment_status}
@@ -251,19 +263,24 @@ export default function AdminOrders() {
 
               <div className="border-t border-[var(--border)] pt-3 mt-3">
                 <h4 className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Товары</h4>
-                {detail.items.map((item, i) => (
-                  <div key={i} className="flex justify-between gap-4 py-1">
-                    <span className="text-[var(--text-secondary)]">
-                      {item.brand} {item.name} {item.volume_ml ? `${item.volume_ml}ml` : ""} x {item.quantity}
-                    </span>
-                    <span className="text-[var(--text-primary)] whitespace-nowrap">{formatPrice((item.price_usd ?? (item as unknown as {price:number}).price) * item.quantity)}</span>
-                  </div>
-                ))}
+                {detail.items.map((item, i) => {
+                  const catLabel = item.category === "oil" ? "Масло" : item.category === "perfume" ? "Парфюм" : "Аксессуар";
+                  const unitLabel = item.unit === "ml" ? `${item.quantity} мл` : `${item.quantity} шт.`;
+                  return (
+                    <div key={i} className="flex justify-between gap-4 py-1">
+                      <span className="text-[var(--text-secondary)]">
+                        <span className="text-[var(--gold)] text-xs font-semibold mr-1">[{catLabel}]</span>
+                        {item.name} · {unitLabel}
+                      </span>
+                      <span className="text-[var(--text-primary)] whitespace-nowrap">{formatPrice(itemKzt(item, kztRate) * item.quantity)}</span>
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="border-t border-[var(--border)] pt-3 flex justify-between">
                 <span className="font-semibold text-[var(--text-primary)]">Итого</span>
-                <span className="font-bold text-lg text-gold-gradient">{formatPrice(detail.total_display_currency ?? detail.total_usd)}</span>
+                <span className="font-bold text-lg text-gold-gradient">{formatPrice(orderTotalKzt(detail.items, kztRate))}</span>
               </div>
             </div>
           </div>

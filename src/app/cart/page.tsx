@@ -213,8 +213,13 @@ export default function CartPage() {
                 </div>
 
                 <div>
-                  <p className="product-brand">{item.brand}</p>
+                  {item.category !== "accessory" && <p className="product-brand">{item.brand}</p>}
                   <h3 className="product-title">{item.name}</h3>
+                  {item.category !== "accessory" && (
+                    <p className="product-category-label">
+                      {item.category === "oil" ? "Масло" : "Парфюм"}
+                    </p>
+                  )}
                   <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
                     {isAvailable
                       ? `В наличии: ${availableCount} ${UNIT_LABELS[item.unit ?? "pcs"]}`

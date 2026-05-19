@@ -310,12 +310,14 @@ export default function CheckoutPage() {
             <div className="order-items">
               {items.map((item) => {
                 const unitLabel = UNIT_LABELS[item.unit ?? "pcs"];
+                const catLabel = item.category === "oil" ? "Масло" : item.category === "perfume" ? "Парфюм" : "Аксессуар";
                 return (
                   <div key={item.product_id} className="order-item">
                     <span>
-                      {item.brand} {item.name} — {item.quantity} {unitLabel}
+                      {catLabel}: {item.name} — {item.quantity} {unitLabel}
                     </span>
                     <strong>{formatKzt(itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity)}</strong>
+
                   </div>
                 );
               })}
