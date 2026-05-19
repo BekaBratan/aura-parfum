@@ -11,6 +11,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [loading, setLoading] = useState(true);
   const [sideOpen, setSideOpen] = useState(false);
   const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -22,6 +23,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         router.replace("/auth");
         return;
       }
+
+      setUserEmail(data.user.email ?? null);
 
       const { data: roles } = await supabase
         .from("user_roles")
@@ -103,13 +106,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </Link>
           ))}
         </nav>
-        <div className="p-4 border-t border-[var(--border)] shrink-0">
-          <p className="px-4 pb-2 text-xs text-[var(--text-secondary)]">{roleLabel}</p>
+        <div className="p-4 border-t border-[var(--border)] shrink-0 space-y-1">
+          {/* Current user card */}
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg bg-white/[0.03] mb-2">
+            <div className="w-8 h-8 rounded-full bg-[var(--gold)]/20 flex items-center justify-center text-[var(--gold)] font-bold text-sm shrink-0 uppercase">
+              {userEmail?.[0] ?? "?"}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-[var(--text-primary)] truncate">{userEmail ?? "—"}</p>
+              <p className="text-[10px] text-[var(--gold)] font-medium">{roleLabel}</p>
+            </div>
+          </div>
           <a
             href="/"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors w-full px-4 py-2 mb-1"
+            className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors w-full px-4 py-2"
           >
             <ExternalLink size={18} /> Главная страница
           </a>
@@ -124,6 +136,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <header className="h-16 border-b border-[var(--border)] bg-[var(--dark-2)] flex items-center px-4 lg:px-8 gap-4 sticky top-0 z-30">
           <button onClick={() => setSideOpen(true)} className="lg:hidden text-[var(--text-secondary)] cursor-pointer"><Menu size={22} /></button>
           <h2 className="text-sm font-medium text-[var(--text-primary)]">Панель управления · {roleLabel}</h2>
+          <div className="ml-auto flex items-center gap-2">
+            <div className="w-7 h-7 rounded-full bg-[var(--gold)]/20 flex items-center justify-center text-[var(--gold)] font-bold text-xs uppercase shrink-0">
+              {userEmail?.[0] ?? "?"}
+            </div>
+            <span className="text-xs text-[var(--text-secondary)] hidden sm:block truncate max-w-[180px]">{userEmail ?? "—"}</span>
+          </div>
         </header>
         <div className="flex-1 p-4 sm:p-6 lg:p-8">{children}</div>
       </div>
