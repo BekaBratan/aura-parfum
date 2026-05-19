@@ -137,10 +137,20 @@ function CatalogContent() {
     [products, activeCategory]
   );
 
-  // Unique brands for current category
+  // Products further filtered by active gender (for building filter option lists)
+  const genderFilteredProducts = useMemo(() => {
+    const activeGenders = filters.attributeFilters["gender"] ?? [];
+    if (!activeGenders.length) return categoryProducts;
+    return categoryProducts.filter((p) => {
+      const g = (p.attributes?.["gender"] as string | undefined) ?? p.gender;
+      return activeGenders.includes(g);
+    });
+  }, [categoryProducts, filters.attributeFilters]);
+
+  // Unique brands — respects active gender filter
   const brands = useMemo(
-    () => [...new Set(categoryProducts.map((p) => p.brand))].sort(),
-    [categoryProducts]
+    () => [...new Set(genderFilteredProducts.map((p) => p.brand))].sort(),
+    [genderFilteredProducts]
   );
 
   // Attribute filter config + available options for current category
@@ -153,7 +163,7 @@ function CatalogContent() {
     const opts: Record<string, string[]> = {};
     for (const { key } of attrFilterConfig) {
       const values = new Set<string>();
-      for (const product of categoryProducts) {
+      for (const product of genderFilteredProducts) {
         const val = product.attributes?.[key];
         if (typeof val === "string" && val) values.add(val);
         if (Array.isArray(val)) val.forEach((v) => typeof v === "string" && values.add(v));
@@ -161,7 +171,7 @@ function CatalogContent() {
       opts[key] = [...values].sort();
     }
     return opts;
-  }, [categoryProducts, attrFilterConfig]);
+  }, [genderFilteredProducts, attrFilterConfig]);
 
   // Gender quick-filter — only for oil and perfume
   const showGenderFilter =
@@ -186,6 +196,8 @@ function CatalogContent() {
       const current = prev.attributeFilters["gender"] ?? [];
       return {
         ...prev,
+        brands: [],
+        countries: [],
         attributeFilters: {
           ...prev.attributeFilters,
           gender: current.includes(val)
@@ -203,12 +215,12 @@ function CatalogContent() {
     if (!showCountryFilter) return [];
     return [
       ...new Set(
-        categoryProducts
+        genderFilteredProducts
           .map((p) => p.country_of_origin)
           .filter((c): c is string => Boolean(c))
       ),
     ].sort();
-  }, [categoryProducts, showCountryFilter]);
+  }, [genderFilteredProducts, showCountryFilter]);
 
   // Apply all filters
   const filtered = useMemo(() => {
@@ -453,8 +465,8 @@ function CatalogContent() {
 
         {/* Filter panel */}
         <div className={`filter-panel ${showFilters ? "" : "is-hidden"}`}>
-          {/* Brand filter (all categories) */}
-          {brands.length > 0 && (
+          {/* Brand filter — not for accessories */}
+          {activeCategory !== "accessory" && brands.length > 0 && (
             <div>
               <h4 className="filter-title">Бренд</h4>
               <div className="filter-options">

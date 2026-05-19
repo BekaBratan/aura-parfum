@@ -7,6 +7,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
 import { formatPriceUsd, formatPricePerUnit, getProductPrice, UNIT_LABELS, GENDER_LABELS } from "@/lib/utils";
+import { formatKzt } from "@/lib/currency";
 import { formatUsd } from "@/lib/currency";
 import { COUNTRY_CODES } from "@/lib/countries";
 import { useCartStore } from "@/store/cartStore";
@@ -189,7 +190,7 @@ export default function ProductPage() {
           <div className="detail-panel">
             {/* Brand, name, category */}
             <div>
-              <p className="product-brand">{product.brand}</p>
+              {product.category !== "accessory" && <p className="product-brand">{product.brand}</p>}
               <h1 className="detail-title">{product.name}</h1>
               {categoryLabel && (
                 <p className="product-category-label" style={{ marginTop: 6 }}>{categoryLabel}</p>
@@ -243,13 +244,16 @@ export default function ProductPage() {
               <p className="price detail-price">
                 {isMl
                   ? formatPricePerUnit(priceUsd, "ml", kztRate)
+                  : product.category === "accessory"
+                  ? formatKzt(priceUsd)
                   : formatPriceUsd(priceUsd, kztRate)}
               </p>
-              <p className="detail-price-usd">
-                {isMl
-                  ? `${formatUsd(priceUsd)} / мл`
-                  : formatUsd(priceUsd)}
-              </p>
+              {!isMl && product.category !== "accessory" && (
+                <p className="detail-price-usd">{formatUsd(priceUsd)}</p>
+              )}
+              {isMl && (
+                <p className="detail-price-usd">{formatUsd(priceUsd)} / мл</p>
+              )}
             </div>
 
             {/* Volume selector for ml products */}

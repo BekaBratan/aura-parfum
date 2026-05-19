@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { ArrowLeft, Loader2, Send, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatPriceUsd, UNIT_LABELS } from "@/lib/utils";
+import { formatPriceUsd, UNIT_LABELS, itemPriceKzt } from "@/lib/utils";
+import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
 import { CartItem } from "@/types";
@@ -42,6 +43,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const items = useCartStore((s) => s.items);
   const totalUsd = useCartStore((s) => s.totalUsd);
+  const totalKzt = useCartStore((s) => s.totalKzt);
   const kztRate = useCurrencyStore((s) => s.kztRate);
   const clearCart = useCartStore((s) => s.clearCart);
   const syncItemsWithProducts = useCartStore((s) => s.syncItemsWithProducts);
@@ -174,7 +176,9 @@ export default function CheckoutPage() {
         product_id: item.product_id,
         name: item.name,
         brand: item.brand,
-        price_usd: Number(item.price_usd),
+        price_usd: item.category === "accessory"
+          ? Number(item.price_usd) / kztRate
+          : Number(item.price_usd),
         quantity: Number(item.quantity),
         volume_ml: item.volume_ml,
         image_url: item.image_url,
@@ -311,14 +315,14 @@ export default function CheckoutPage() {
                     <span>
                       {item.brand} {item.name} — {item.quantity} {unitLabel}
                     </span>
-                    <strong>{formatPriceUsd(item.price_usd * item.quantity, kztRate)}</strong>
+                    <strong>{formatKzt(itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity)}</strong>
                   </div>
                 );
               })}
             </div>
             <div className="summary-row order-total-row">
               <span>Итого</span>
-              <span className="summary-total">{formatPriceUsd(totalUsd(), kztRate)}</span>
+              <span className="summary-total">{formatKzt(totalKzt(kztRate))}</span>
             </div>
           </aside>
         </div>

@@ -6,7 +6,7 @@ import { ImageIcon, Loader2, Pencil, Plus, Save, Search, Trash2, Upload, X } fro
 import toast from "react-hot-toast";
 import { useAdminRole } from "@/lib/adminRole";
 import { createClient } from "@/lib/supabase/client";
-import { CATEGORY_LABELS, UNIT_LABELS } from "@/lib/utils";
+import { CATEGORY_LABELS, UNIT_LABELS, GENDER_LABELS } from "@/lib/utils";
 import { formatKzt, convertToKzt } from "@/lib/currency";
 import { Product, ProductCategory } from "@/types";
 import { COUNTRIES } from "@/lib/countries";
@@ -177,6 +177,15 @@ export default function AdminProducts() {
   const [filterStock, setFilterStock] = useState<"all" | "in" | "out">("all");
   const [filterQuality, setFilterQuality] = useState<"all" | "deluxe" | "premium">("all");
   const [filterAccessoryType, setFilterAccessoryType] = useState<string>("all");
+  const [filterGender, setFilterGender] = useState<string>("all");
+  const [filterCountry, setFilterCountry] = useState<string>("all");
+  const [filterFeatured, setFilterFeatured] = useState(false);
+
+  // Dynamic options from current category
+  const catProducts = useMemo(
+    () => filterCategory === "all" ? products : products.filter((p) => p.category === filterCategory),
+    [products, filterCategory]
+  );
 
   const accessoryTypes = useMemo(() => {
     const types = products
@@ -184,6 +193,33 @@ export default function AdminProducts() {
       .map((p) => String(p.attributes.type));
     return [...new Set(types)].sort();
   }, [products]);
+
+  const availableCountries = useMemo(() => {
+    const c = catProducts
+      .map((p) => p.country_of_origin)
+      .filter((c): c is string => Boolean(c));
+    return [...new Set(c)].sort();
+  }, [catProducts]);
+
+  const hasProductsWithoutCountry = useMemo(
+    () => catProducts.some((p) => !p.country_of_origin),
+    [catProducts]
+  );
+
+  const availableGenders = useMemo(() => {
+    const g = catProducts
+      .map((p) => (p.attributes?.["gender"] as string | undefined) ?? p.gender)
+      .filter(Boolean) as string[];
+    return ["men", "women", "unisex"].filter((v) => g.includes(v));
+  }, [catProducts]);
+
+  const hasProductsWithoutGender = useMemo(
+    () => catProducts.some((p) => {
+      const g = (p.attributes?.["gender"] as string | undefined) ?? p.gender;
+      return !g;
+    }),
+    [catProducts]
+  );
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -197,13 +233,21 @@ export default function AdminProducts() {
       if (filterCategory === "accessory" && filterAccessoryType !== "all") {
         if (String(p.attributes?.type ?? "") !== filterAccessoryType) return false;
       }
+      if (filterGender !== "all") {
+        const g = (p.attributes?.["gender"] as string | undefined) ?? p.gender;
+        if (filterGender === "__empty__" ? Boolean(g) : g !== filterGender) return false;
+      }
+      if (filterCountry !== "all") {
+        if (filterCountry === "__empty__" ? Boolean(p.country_of_origin) : p.country_of_origin !== filterCountry) return false;
+      }
+      if (filterFeatured && !p.is_featured) return false;
       if (search) {
         const q = search.toLowerCase();
         if (!p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [products, search, filterCategory, filterStock, filterQuality, filterAccessoryType]);
+  }, [products, search, filterCategory, filterStock, filterQuality, filterAccessoryType, filterGender, filterCountry, filterFeatured]);
 
   const supabase = createClient();
   const imagePreviewSrc = selectedImagePreviewUrl || form.image_url.trim();
@@ -252,7 +296,7 @@ export default function AdminProducts() {
       brand: product.brand,
       description: product.description || "",
       price: isAccessory
-        ? String(Math.round(Number(product.price_usd) * kztRate))
+        ? String(Math.round(Number(product.price_usd)))
         : String(product.price_usd ?? ""),
       category: product.category ?? "perfume",
       volume_ml: product.volume_ml === null ? "" : String(product.volume_ml),
@@ -286,14 +330,13 @@ export default function AdminProducts() {
   const handleSave = async () => {
     if (!isAdmin) return;
 
-    if (!form.name || !form.brand) { toast.error("Заполните название и бренд"); return; }
+    if (!form.name) { toast.error("Заполните название товара"); return; }
+    if (!form.brand && form.category !== "accessory") { toast.error("Заполните бренд"); return; }
     if (form.price === "") { toast.error("Укажите цену товара"); return; }
     const priceInput = Number(form.price);
     if (priceInput <= 0) { toast.error("Цена должна быть больше 0"); return; }
     // For accessories price is entered in KZT — convert to USD for storage
-    const price = form.category === "accessory"
-      ? priceInput / (kztRate || 1)
-      : priceInput;
+    const price = priceInput;
     if (form.count === "") { toast.error("Укажите количество товара"); return; }
     const count = Math.floor(Number(form.count));
     if (count < 0) { toast.error("Количество не может быть отрицательным"); return; }
@@ -563,6 +606,76 @@ export default function AdminProducts() {
               ))}
             </div>
           </div>
+
+          {availableGenders.length > 0 && filterCategory !== "accessory" && (
+            <>
+              <div className="admin-filter-divider" />
+              <div className="admin-filter-group">
+                <span className="admin-filter-label">Пол</span>
+                <div className="admin-filter-pills">
+                  <button onClick={() => setFilterGender("all")}
+                    className={`admin-filter-pill${filterGender === "all" ? " is-active" : ""}`}>
+                    Все
+                  </button>
+                  {availableGenders.map((g) => (
+                    <button key={g} onClick={() => setFilterGender(g)}
+                      className={`admin-filter-pill${filterGender === g ? " is-active" : ""}`}>
+                      {GENDER_LABELS[g] ?? g}
+                    </button>
+                  ))}
+                  {hasProductsWithoutGender && (
+                    <button onClick={() => setFilterGender("__empty__")}
+                      className={`admin-filter-pill${filterGender === "__empty__" ? " is-active" : ""}`}>
+                      Не указан
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {availableCountries.length > 0 && filterCategory !== "accessory" && (
+            <>
+              <div className="admin-filter-divider" />
+              <div className="admin-filter-group">
+                <span className="admin-filter-label">Страна</span>
+                <div className="admin-filter-pills">
+                  <button onClick={() => setFilterCountry("all")}
+                    className={`admin-filter-pill${filterCountry === "all" ? " is-active" : ""}`}>
+                    Все
+                  </button>
+                  {availableCountries.map((c) => (
+                    <button key={c} onClick={() => setFilterCountry(c)}
+                      className={`admin-filter-pill${filterCountry === c ? " is-active" : ""}`}>
+                      {c}
+                    </button>
+                  ))}
+                  {hasProductsWithoutCountry && (
+                    <button onClick={() => setFilterCountry("__empty__")}
+                      className={`admin-filter-pill${filterCountry === "__empty__" ? " is-active" : ""}`}>
+                      Не указана
+                    </button>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="admin-filter-divider" />
+
+          <div className="admin-filter-group">
+            <span className="admin-filter-label">Хиты</span>
+            <div className="admin-filter-pills">
+              <button onClick={() => setFilterFeatured(false)}
+                className={`admin-filter-pill${!filterFeatured ? " is-active" : ""}`}>
+                Все
+              </button>
+              <button onClick={() => setFilterFeatured(true)}
+                className={`admin-filter-pill${filterFeatured ? " is-active" : ""}`}>
+                Только хиты
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -595,7 +708,7 @@ export default function AdminProducts() {
                   <tr key={product.id} className="border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors">
                     <td className="py-3 pr-4"><ProductThumbnail product={product} /></td>
                     <td className="py-3 pr-4 text-[var(--text-primary)]">{product.name}</td>
-                    <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{product.brand}</td>
+                    <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{cat !== "accessory" ? product.brand : "—"}</td>
                     <td className="py-3 pr-4 hidden md:table-cell">
                       <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)]">
                         {CATEGORY_LABELS[cat]}
@@ -616,7 +729,9 @@ export default function AdminProducts() {
                       )}
                     </td>
                     <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">
-                      {formatKzt(convertToKzt(product.price_usd, kztRate))}{unit === "ml" ? " /мл" : ""}
+                      {cat === "accessory"
+                        ? formatKzt(product.price_usd)
+                        : formatKzt(convertToKzt(product.price_usd, kztRate))}{unit === "ml" ? " /мл" : ""}
                     </td>
                     <td className="py-3 pr-4 hidden md:table-cell">
                       <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
@@ -666,10 +781,12 @@ export default function AdminProducts() {
                 <input id="product-name" name="name" value={form.name} onChange={handleChange} placeholder="Например: Coco Mademoiselle" className="input-dark" />
               </div>
 
-              <div className="form-group">
-                <label htmlFor="product-brand" className="form-label">Бренд</label>
-                <input id="product-brand" name="brand" value={form.brand} onChange={handleChange} placeholder="Например: Chanel" className="input-dark" />
-              </div>
+              {form.category !== "accessory" && (
+                <div className="form-group">
+                  <label htmlFor="product-brand" className="form-label">Бренд</label>
+                  <input id="product-brand" name="brand" value={form.brand} onChange={handleChange} placeholder="Например: Chanel" className="input-dark" />
+                </div>
+              )}
 
               <div className="form-group">
                 <label htmlFor="product-description" className="form-label">Описание</label>

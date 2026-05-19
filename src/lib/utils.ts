@@ -1,6 +1,11 @@
 import type { ProductCategory, ProductUnit } from "@/types";
 import { formatKzt, convertToKzt } from "@/lib/currency";
 
+// For accessories price_usd stores raw KZT; for others it's real USD
+export function itemPriceKzt(priceUsd: number, category: string, kztRate: number): number {
+  return category === "accessory" ? priceUsd : priceUsd * kztRate;
+}
+
 // Format a KZT amount (already converted)
 export function formatPrice(kztAmount: number): string {
   return formatKzt(kztAmount);

@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
-import { formatPriceUsd, UNIT_LABELS } from "@/lib/utils";
+import { formatPriceUsd, UNIT_LABELS, itemPriceKzt } from "@/lib/utils";
+import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
 import Image from "next/image";
 import Link from "next/link";
@@ -46,6 +47,7 @@ export default function CartPage() {
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
   const totalUsd = useCartStore((s) => s.totalUsd);
+  const totalKzt = useCartStore((s) => s.totalKzt);
   const kztRate = useCurrencyStore((s) => s.kztRate);
   const clearCart = useCartStore((s) => s.clearCart);
   const syncItemsWithProducts = useCartStore((s) => s.syncItemsWithProducts);
@@ -269,7 +271,7 @@ export default function CartPage() {
                 )}
 
                 <div className="cart-line-total">
-                  <p className="price">{formatPriceUsd(item.price_usd * item.quantity, kztRate)}</p>
+                  <p className="price">{formatKzt(itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity)}</p>
                   <button onClick={() => removeItem(item.product_id)} className="btn btn-ghost">
                     Удалить
                   </button>
@@ -282,7 +284,7 @@ export default function CartPage() {
         <div className="card summary-card">
           <div className="summary-row">
             <span>Итого</span>
-            <span className="summary-total">{formatPriceUsd(totalUsd(), kztRate)}</span>
+            <span className="summary-total">{formatKzt(totalKzt(kztRate))}</span>
           </div>
 
           {hasInvalidStock ? (

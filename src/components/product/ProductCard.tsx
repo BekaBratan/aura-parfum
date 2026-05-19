@@ -3,7 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Check, ShoppingBag } from "lucide-react";
-import { formatPriceUsd, formatPricePerUnit, getProductPrice, UNIT_LABELS } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice, UNIT_LABELS, itemPriceKzt } from "@/lib/utils";
+import { formatKzt } from "@/lib/currency";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { Product } from "@/types";
@@ -74,6 +75,8 @@ export default function ProductCard({
   const priceUsd = getProductPrice(product);
   const priceDisplay = isMl
     ? formatPricePerUnit(priceUsd, "ml", kztRate)
+    : product.category === "accessory"
+    ? formatKzt(priceUsd)
     : formatPriceUsd(priceUsd, kztRate);
 
   const countryCode = product.country_of_origin
@@ -131,9 +134,6 @@ export default function ProductCard({
             {!isList && product.category === "accessory" && product.attributes?.type && (
               <span className="badge badge-muted">{String(product.attributes.type)}</span>
             )}
-            {!isAvailable && (
-              <span className="badge badge-danger">Нет в наличии</span>
-            )}
           </div>
 
           {countryCode && !isList && (
@@ -158,7 +158,7 @@ export default function ProductCard({
             <div className="product-list-content">
               <div className="product-list-main">
                 <div className="product-list-brand-row">
-                  <p className="product-brand">{product.brand}</p>
+                  {product.category !== "accessory" && <p className="product-brand">{product.brand}</p>}
                   <div className="product-list-inline-badges">
                     {product.category !== "accessory" && product.attributes?.quality === "De Luxe" && (
                       <span className="badge badge-deluxe">De Luxe</span>
@@ -232,7 +232,7 @@ export default function ProductCard({
           </>
         ) : (
           <div className="product-card-body">
-            <p className="product-brand">{product.brand}</p>
+            {product.category !== "accessory" && <p className="product-brand">{product.brand}</p>}
             <h3 className="product-title">{product.name}</h3>
             {categoryLabel && (
               <p className="product-category-label">{categoryLabel}</p>

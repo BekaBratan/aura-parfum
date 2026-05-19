@@ -23,6 +23,7 @@ interface CartStore {
   clearCart: () => void;
   totalItems: () => number;
   totalUsd: () => number;
+  totalKzt: (kztRate: number) => number;
 }
 
 export const useCartStore = create<CartStore>()(
@@ -106,6 +107,12 @@ export const useCartStore = create<CartStore>()(
 
       totalUsd: () =>
         get().items.reduce((sum, i) => sum + i.price_usd * i.quantity, 0),
+
+      totalKzt: (kztRate: number) =>
+        get().items.reduce((sum, i) => {
+          const kzt = i.category === "accessory" ? i.price_usd : i.price_usd * kztRate;
+          return sum + kzt * i.quantity;
+        }, 0),
     }),
     { name: "aura-cart" }
   )
