@@ -15,10 +15,8 @@ interface Option {
 type OptionType = "country" | "quality" | "accessory_type" | "brand";
 
 const SECTIONS: { type: OptionType; label: string; placeholder: string; hint?: string }[] = [
-  { type: "country",        label: "Страны происхождения", placeholder: "Например: Япония" },
-  { type: "quality",        label: "Типы качества",        placeholder: "Например: Elite",   hint: "Используется для масел и парфюма (De Luxe, Premium...)" },
-  { type: "accessory_type", label: "Виды аксессуаров",     placeholder: "Например: Диффузор", hint: "Отображается как тип на карточке аксессуара" },
-  { type: "brand",          label: "Бренды",               placeholder: "Например: Dior",     hint: "Используется как подсказка при добавлении товара" },
+  { type: "country", label: "Страны происхождения", placeholder: "Например: Япония" },
+  { type: "quality", label: "Типы качества",        placeholder: "Например: Elite", hint: "Используется для масел и парфюма (De Luxe, Premium...)" },
 ];
 
 function Section({
