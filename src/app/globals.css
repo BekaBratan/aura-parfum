@@ -464,7 +464,7 @@ img {
 .product-card-media,
 .product-card-image {
   position: relative;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 1 / 1.15;
   overflow: hidden;
   background: var(--color-surface-soft);
 }
@@ -518,15 +518,13 @@ img {
   height: 28px;
   border-radius: 50%;
   background: rgba(138, 97, 22, 0.65);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(199, 160, 90, 0.35);
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 0.71rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  /* color: var(--color-accent); */
   color: #fff;
   text-transform: uppercase;
   pointer-events: none;
@@ -723,18 +721,9 @@ img {
 
 .product-list-media .badge {
   white-space: nowrap;
-}
-
-.product-list-content {
-  display: grid;
-  min-width: 0;
-  gap: 16px;
-  align-self: stretch;
-  align-content: center;
-}
-
-.product-list-main {
-  min-width: 0;
+  font-size: 0.62rem;
+  padding: 2px 7px;
+  min-height: 0;
 }
 
 .product-list-brand-row {
@@ -763,21 +752,51 @@ img {
   line-height: 1.4;
 }
 
+.product-list-inline-badges .badge-deluxe {
+  background: rgba(18, 80, 58, 0.18);
+  color: #2a9d6e;
+  border: 1px solid rgba(18, 80, 58, 0.3);
+}
+
+.product-list-inline-badges .badge-premium {
+  background: rgba(38, 52, 96, 0.14);
+  color: #5878b4;
+  border: 1px solid rgba(38, 52, 96, 0.25);
+}
+
+.product-list-inline-badges .badge-muted {
+  background: rgba(105, 62, 18, 0.12);
+  color: #8a5c28;
+  border: 1px solid rgba(105, 62, 18, 0.22);
+}
+
 .badge-country-round {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid var(--color-border);
+  background: rgba(138, 97, 22, 0.15);
+  border: 1px solid rgba(138, 97, 22, 0.3);
   font-size: 0.6rem;
   font-weight: 700;
-  color: var(--color-muted);
+  color: #8a6a35;
   flex-shrink: 0;
   letter-spacing: 0;
   align-self: center;
+}
+
+.product-list-content {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  align-self: stretch;
+  align-content: center;
+}
+
+.product-list-main {
+  min-width: 0;
 }
 
 .product-list-main .product-brand {
@@ -1048,6 +1067,46 @@ img {
   letter-spacing: 0.04em;
 }
 
+/* ─── Image overlay badges — unified luxury style ─────────────── */
+.product-card-badges .badge,
+.product-card-badges .badge-deluxe,
+.product-card-badges .badge-premium,
+.product-card-badges .badge-muted {
+  border-radius: 999px;
+  font-size: 0.71rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  min-height: 0;
+  line-height: 1.55;
+  border: none;
+}
+
+/* Хит — красно-рубиновый, выделяется */
+.product-card-badges .badge {
+  background: rgba(175, 35, 18, 0.82);
+  color: #fff;
+}
+
+/* De Luxe — изумрудно-зелёный */
+.product-card-badges .badge-deluxe {
+  background: rgba(18, 80, 58, 0.85);
+  color: #a0eed0;
+}
+
+/* Premium — тёмно-индиго */
+.product-card-badges .badge-premium {
+  background: rgba(38, 52, 96, 0.85);
+  color: #b8ccee;
+}
+
+/* Тип аксессуара — медно-коричневый */
+.product-card-badges .badge-muted {
+  background: rgba(105, 62, 18, 0.78);
+  color: #fff;
+}
+
 .card,
 .glass-card,
 .admin-card {
@@ -1058,7 +1117,7 @@ img {
 }
 
 .catalog-layout {
-  padding: 112px 0 64px;
+  padding: 30px 0 64px;
 }
 
 /* Category tabs */
@@ -1281,7 +1340,7 @@ img {
 }
 
 .product-detail {
-  padding: 112px 0 72px;
+  padding: 30px 0 72px;
 }
 
 .back-link {
@@ -1480,7 +1539,7 @@ img {
 .checkout-layout,
 .auth-layout,
 .invoice-layout {
-  padding: 112px 0 72px;
+  padding: 30px 0 72px;
 }
 
 .cart-header,
@@ -2044,7 +2103,7 @@ img {
   }
 
   .catalog-layout {
-    padding: 92px 0 48px;
+    padding: 30px 0 48px;
   }
 
   .view-toggle-button {
