@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -34,7 +34,9 @@ export default function ProductPage() {
   const [imageError, setImageError] = useState(false);
   const [chosenVolume, setChosenVolume] = useState<number>(1);
   const addItem = useCartStore((s) => s.addItem);
+  const cartItems = useCartStore((s) => s.items);
   const kztRate = useCurrencyStore((s) => s.kztRate);
+  const router = useRouter();
 
   const productCount = Number(product?.count ?? 0);
   const isAvailable = productCount > 0;
@@ -82,6 +84,9 @@ export default function ProductPage() {
     const label = isMl ? `${qty} мл → ${totalKzt}` : product.name;
     toast.success(`Добавлено: ${label}`);
   };
+
+  const cartItem = product ? cartItems.find((i) => i.product_id === product.id) : null;
+  const isInCart = !!cartItem;
 
   if (loading) {
     return (
@@ -274,20 +279,31 @@ export default function ProductPage() {
               </div>
             )}
 
+            {isMl && isInCart && (
+              <div className="detail-in-cart-notice">
+                <Check size={14} />
+                <span>В корзине: {cartItem!.quantity} мл</span>
+                <Link href="/cart" className="detail-cart-link">Перейти в корзину →</Link>
+              </div>
+            )}
+
             <button
-              onClick={handleAdd}
+              onClick={!isMl && isInCart ? () => router.push("/cart") : handleAdd}
               disabled={
                 !isAvailable ||
                 (isMl && (chosenVolume < minVolume || chosenVolume > productCount))
               }
-              className={`btn ${isAvailable ? "btn-primary" : "btn-secondary"}`}
+              className={`btn ${!isMl && isInCart ? "product-detail-in-cart-btn" : isAvailable ? "btn-primary" : "btn-secondary"}`}
             >
-              <ShoppingBag size={18} />
-              {!isAvailable
-                ? "Нет в наличии"
-                : isMl
-                ? `В корзину — ${chosenVolume} мл`
-                : "Добавить в корзину"}
+              {!isMl && isInCart ? (
+                <><Check size={18} />В корзине</>
+              ) : (
+                <><ShoppingBag size={18} />{!isAvailable
+                  ? "Нет в наличии"
+                  : isMl
+                  ? (isInCart ? `Обновить — ${chosenVolume} мл` : `В корзину — ${chosenVolume} мл`)
+                  : "Добавить в корзину"}</>
+              )}
             </button>
           </div>
         </div>

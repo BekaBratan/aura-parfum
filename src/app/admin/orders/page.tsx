@@ -106,52 +106,68 @@ export default function AdminOrders() {
     }
   };
 
-  const FilterChip = ({ value, active, onClick, children }: { value: string; active: boolean; onClick: () => void; children: React.ReactNode }) => (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${active ? "bg-[var(--gold)]/20 text-[var(--gold)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-white/5"}`}
-    >
-      {children}
-    </button>
-  );
-
   return (
     <div>
       <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-4">Заказы</h1>
 
       {/* Search + filters */}
-      <div className="space-y-2 mb-4">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по счёту, имени или телефону..."
-            className="input-dark w-full pl-9 py-2 text-sm"
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] cursor-pointer">
-              <X size={14} />
-            </button>
-          )}
+      <div className="admin-filter-bar">
+        <div className="admin-filter-search-row">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по счёту, имени или телефону..."
+              className="input-dark w-full"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer" aria-label="Очистить">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <span className="admin-filter-count">
+            {filteredOrders.length === orders.length
+              ? `${orders.length} заказов`
+              : `${filteredOrders.length} из ${orders.length}`}
+          </span>
         </div>
 
-        <div className="flex flex-wrap gap-x-4 gap-y-2">
-          <div className="flex items-center gap-1 flex-wrap">
-            <span className="text-xs text-[var(--text-secondary)] mr-1">Статус:</span>
-            <FilterChip value="all" active={filterOrderStatus === "all"} onClick={() => setFilterOrderStatus("all")}>Все</FilterChip>
-            {Object.entries(ORDER_STATUS_LABELS).map(([val, label]) => (
-              <FilterChip key={val} value={val} active={filterOrderStatus === val} onClick={() => setFilterOrderStatus(val)}>{label}</FilterChip>
-            ))}
+        <div className="admin-filter-groups">
+          <div className="admin-filter-group">
+            <span className="admin-filter-label">Статус</span>
+            <div className="admin-filter-pills">
+              <button onClick={() => setFilterOrderStatus("all")}
+                className={`admin-filter-pill${filterOrderStatus === "all" ? " is-active" : ""}`}>
+                Все
+              </button>
+              {Object.entries(ORDER_STATUS_LABELS).map(([val, label]) => (
+                <button key={val} onClick={() => setFilterOrderStatus(val)}
+                  className={`admin-filter-pill${filterOrderStatus === val ? " is-active" : ""}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-1 flex-wrap">
-            <span className="text-xs text-[var(--text-secondary)] mr-1">Оплата:</span>
-            <FilterChip value="all" active={filterPayStatus === "all"} onClick={() => setFilterPayStatus("all")}>Все</FilterChip>
-            {Object.entries(PAYMENT_STATUS_LABELS).map(([val, label]) => (
-              <FilterChip key={val} value={val} active={filterPayStatus === val} onClick={() => setFilterPayStatus(val)}>{label}</FilterChip>
-            ))}
+
+          <div className="admin-filter-divider" />
+
+          <div className="admin-filter-group">
+            <span className="admin-filter-label">Оплата</span>
+            <div className="admin-filter-pills">
+              <button onClick={() => setFilterPayStatus("all")}
+                className={`admin-filter-pill${filterPayStatus === "all" ? " is-active" : ""}`}>
+                Все
+              </button>
+              {Object.entries(PAYMENT_STATUS_LABELS).map(([val, label]) => (
+                <button key={val} onClick={() => setFilterPayStatus(val)}
+                  className={`admin-filter-pill${filterPayStatus === val ? " is-active" : ""}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-          <span className="self-center text-xs text-[var(--text-secondary)]">{filteredOrders.length} из {orders.length}</span>
         </div>
       </div>
 

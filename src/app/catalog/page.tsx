@@ -29,11 +29,9 @@ const CATEGORY_ATTRIBUTE_FILTERS: Record<
   ProductCategory,
   Array<{ key: string; label: string }>
 > = {
-  oil: [],
-  perfume: [],
-  accessory: [
-    { key: "type", label: "Тип" },
-  ],
+  oil: [{ key: "quality", label: "Тип" }],
+  perfume: [{ key: "quality", label: "Тип" }],
+  accessory: [{ key: "type", label: "Вид" }],
 };
 
 // Categories where the gender quick-filter row is shown
@@ -179,6 +177,7 @@ function CatalogContent() {
     }
     return ["men", "women", "unisex"].filter((g) => vals.has(g));
   }, [categoryProducts, showGenderFilter]);
+
 
   const activeGenders = filters.attributeFilters["gender"] ?? [];
 
@@ -382,6 +381,7 @@ function CatalogContent() {
             ))}
           </div>
         )}
+
 
         {/* Controls: search + sort + view toggle + filters button */}
         <div className="catalog-controls">

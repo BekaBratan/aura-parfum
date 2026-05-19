@@ -175,19 +175,35 @@ export default function AdminProducts() {
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState<ProductCategory | "all">("all");
   const [filterStock, setFilterStock] = useState<"all" | "in" | "out">("all");
+  const [filterQuality, setFilterQuality] = useState<"all" | "deluxe" | "premium">("all");
+  const [filterAccessoryType, setFilterAccessoryType] = useState<string>("all");
+
+  const accessoryTypes = useMemo(() => {
+    const types = products
+      .filter((p) => p.category === "accessory" && p.attributes?.type)
+      .map((p) => String(p.attributes.type));
+    return [...new Set(types)].sort();
+  }, [products]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       if (filterCategory !== "all" && p.category !== filterCategory) return false;
       if (filterStock === "in" && Number(p.count ?? 0) === 0) return false;
       if (filterStock === "out" && Number(p.count ?? 0) > 0) return false;
+      if (filterCategory !== "accessory") {
+        if (filterQuality === "deluxe" && p.attributes?.quality !== "De Luxe") return false;
+        if (filterQuality === "premium" && p.attributes?.quality !== "Premium") return false;
+      }
+      if (filterCategory === "accessory" && filterAccessoryType !== "all") {
+        if (String(p.attributes?.type ?? "") !== filterAccessoryType) return false;
+      }
       if (search) {
         const q = search.toLowerCase();
         if (!p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [products, search, filterCategory, filterStock]);
+  }, [products, search, filterCategory, filterStock, filterQuality, filterAccessoryType]);
 
   const supabase = createClient();
   const imagePreviewSrc = selectedImagePreviewUrl || form.image_url.trim();
@@ -450,33 +466,104 @@ export default function AdminProducts() {
       </div>
 
       {/* Search + filters */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по названию или бренду..."
-            className="input-dark w-full pl-9 py-2 text-sm"
-          />
+      <div className="admin-filter-bar">
+        <div className="admin-filter-search-row">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Поиск по названию или бренду..."
+              className="input-dark w-full pl-9"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+                aria-label="Очистить"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <span className="admin-filter-count">
+            {filteredProducts.length === products.length
+              ? `${products.length} товаров`
+              : `${filteredProducts.length} из ${products.length}`}
+          </span>
         </div>
-        <div className="flex gap-1">
-          {([["all", "Все"], ["oil", "Масла"], ["perfume", "Парфюм"], ["accessory", "Аксессуары"]] as const).map(([val, label]) => (
-            <button key={val} onClick={() => setFilterCategory(val)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${filterCategory === val ? "bg-[var(--gold)]/20 text-[var(--gold)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-white/5"}`}>
-              {label}
-            </button>
-          ))}
+
+        <div className="admin-filter-groups">
+          <div className="admin-filter-group">
+            <span className="admin-filter-label">Категория</span>
+            <div className="admin-filter-pills">
+              {([["all", "Все"], ["oil", "Масла"], ["perfume", "Парфюм"], ["accessory", "Аксессуары"]] as const).map(([val, label]) => (
+                <button key={val} onClick={() => setFilterCategory(val)}
+                  className={`admin-filter-pill${filterCategory === val ? " is-active" : ""}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filterCategory !== "accessory" && (
+            <>
+              <div className="admin-filter-divider" />
+              <div className="admin-filter-group">
+                <span className="admin-filter-label">Тип</span>
+                <div className="admin-filter-pills">
+                  <button onClick={() => setFilterQuality("all")}
+                    className={`admin-filter-pill${filterQuality === "all" ? " is-active" : ""}`}>
+                    Все
+                  </button>
+                  <button onClick={() => setFilterQuality("deluxe")}
+                    className={`admin-filter-pill${filterQuality === "deluxe" ? " is-active is-active-deluxe" : ""}`}>
+                    De Luxe
+                  </button>
+                  <button onClick={() => setFilterQuality("premium")}
+                    className={`admin-filter-pill${filterQuality === "premium" ? " is-active is-active-premium" : ""}`}>
+                    Premium
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {filterCategory === "accessory" && accessoryTypes.length > 0 && (
+            <>
+              <div className="admin-filter-divider" />
+              <div className="admin-filter-group">
+                <span className="admin-filter-label">Вид</span>
+                <div className="admin-filter-pills">
+                  <button onClick={() => setFilterAccessoryType("all")}
+                    className={`admin-filter-pill${filterAccessoryType === "all" ? " is-active" : ""}`}>
+                    Все
+                  </button>
+                  {accessoryTypes.map((type) => (
+                    <button key={type} onClick={() => setFilterAccessoryType(type)}
+                      className={`admin-filter-pill${filterAccessoryType === type ? " is-active" : ""}`}>
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="admin-filter-divider" />
+
+          <div className="admin-filter-group">
+            <span className="admin-filter-label">Наличие</span>
+            <div className="admin-filter-pills">
+              {([["all", "Все"], ["in", "В наличии"], ["out", "Нет"]] as const).map(([val, label]) => (
+                <button key={val} onClick={() => setFilterStock(val)}
+                  className={`admin-filter-pill${filterStock === val ? " is-active" : ""}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-        <div className="flex gap-1">
-          {([["all", "Все"], ["in", "В наличии"], ["out", "Нет в наличии"]] as const).map(([val, label]) => (
-            <button key={val} onClick={() => setFilterStock(val)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${filterStock === val ? "bg-[var(--gold)]/20 text-[var(--gold)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-white/5"}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <span className="self-center text-xs text-[var(--text-secondary)] ml-1">{filteredProducts.length} товаров</span>
       </div>
 
       {loading ? (
@@ -492,6 +579,7 @@ export default function AdminProducts() {
                 <th className="pb-3 pr-4">Название</th>
                 <th className="pb-3 pr-4 hidden sm:table-cell">Бренд</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Категория</th>
+                <th className="pb-3 pr-4 hidden lg:table-cell">Тип</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Цена</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Наличие</th>
                 {isAdmin && <th className="pb-3 text-right">Действия</th>}
@@ -512,6 +600,20 @@ export default function AdminProducts() {
                       <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)]">
                         {CATEGORY_LABELS[cat]}
                       </span>
+                    </td>
+                    <td className="py-3 pr-4 hidden lg:table-cell">
+                      {cat !== "accessory" && product.attributes?.quality === "De Luxe" && (
+                        <span className="badge badge-deluxe">De Luxe</span>
+                      )}
+                      {cat !== "accessory" && product.attributes?.quality === "Premium" && (
+                        <span className="badge badge-premium">Premium</span>
+                      )}
+                      {cat === "accessory" && product.attributes?.type && (
+                        <span className="text-xs text-[var(--text-secondary)]">{String(product.attributes.type)}</span>
+                      )}
+                      {!product.attributes?.quality && !product.attributes?.type && (
+                        <span className="text-xs text-[var(--text-secondary)]">—</span>
+                      )}
                     </td>
                     <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">
                       {formatKzt(convertToKzt(product.price_usd, kztRate))}{unit === "ml" ? " /мл" : ""}
