@@ -257,8 +257,8 @@ img {
 
 .cart-count {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -4px;
+  right: -4px;
 }
 
 .mobile-menu-panel {
@@ -384,6 +384,12 @@ img {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 18px;
+}
+
+@media (max-width: 1024px) and (min-width: 641px) {
+  .benefits-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .benefit-item {
@@ -884,6 +890,14 @@ img {
   transform: translateY(-1px);
 }
 
+.btn:focus-visible,
+.btn-gold:focus-visible,
+.btn-outline-gold:focus-visible,
+.btn-ghost:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .btn-primary,
 .btn-gold {
   border: 1px solid var(--color-accent);
@@ -920,9 +934,10 @@ img {
 .btn-gold:disabled,
 .btn-outline-gold:disabled,
 .icon-button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none;
+  filter: grayscale(0.3);
 }
 
 .form-field,
@@ -939,7 +954,7 @@ img {
 
 .form-label {
   color: var(--color-muted);
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.35;
 }
@@ -1156,6 +1171,11 @@ img {
   color: var(--color-text);
 }
 
+.catalog-tab:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
 .catalog-tab.is-active {
   color: var(--color-accent-dark);
   border-bottom-color: var(--color-accent);
@@ -1291,6 +1311,11 @@ img {
   color: var(--color-accent-dark);
 }
 
+.chip:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .filter-row {
   display: flex;
   flex-wrap: wrap;
@@ -1304,6 +1329,116 @@ img {
 
 .catalog-results {
   margin-top: 24px;
+}
+
+.catalog-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 0.5vw, 10px);
+  margin-top: clamp(28px, 4vw, 56px);
+  flex-wrap: wrap;
+}
+
+/* ─── Unified pagination ─────────────────────────────────────── */
+
+.pagination-root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(4px, 0.5vw, 10px);
+  flex-wrap: wrap;
+}
+
+.pagination-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(36px, 4vw, 60px);
+  height: clamp(36px, 4vw, 60px);
+  border-radius: 50%;
+  font-size: clamp(0.8rem, 1.1vw, 1.1rem);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.pagination-btn--nav {
+  font-size: clamp(1rem, 1.4vw, 1.4rem);
+  font-weight: 400;
+}
+
+/* Light variant (catalog) */
+.pagination-btn--light {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.pagination-btn--light:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent-dark);
+}
+
+.pagination-btn--light.pagination-btn--active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+/* Dark variant (admin) */
+.pagination-btn--dark {
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary, #6f6a62);
+}
+
+.pagination-btn--dark:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #211f1c);
+}
+
+.pagination-btn--dark.pagination-btn--active {
+  background: rgba(184, 144, 79, 0.2);
+  color: var(--gold, #b8904f);
+}
+
+.pagination-dots {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(28px, 2.5vw, 44px);
+  color: var(--color-muted);
+  font-size: clamp(0.9rem, 1.1vw, 1.1rem);
+  user-select: none;
+}
+
+.pagination-counter {
+  font-size: clamp(0.7rem, 0.85vw, 0.9rem);
+  color: var(--color-muted);
+  margin-left: clamp(4px, 0.5vw, 10px);
+}
+
+@media (max-width: 480px) {
+  .pagination-counter {
+    display: none;
+  }
+}
+
+/* Keep old catalog-pagination class for margin */
+.catalog-pagination {
+  margin-top: clamp(28px, 4vw, 56px);
 }
 
 .skeleton-line {
@@ -1663,6 +1798,32 @@ img {
   display: grid;
   gap: 10px;
   margin-top: 24px;
+}
+
+.btn-whatsapp {
+  background: #25d366;
+  border-color: #25d366;
+  color: #fff;
+}
+
+.btn-whatsapp:hover {
+  background: #1ebe5a;
+  border-color: #1ebe5a;
+}
+
+.btn-danger-soft {
+  background: rgba(180, 35, 24, 0.08);
+  border: 1px solid rgba(180, 35, 24, 0.25);
+  color: var(--color-danger);
+}
+
+.btn-danger-soft:hover {
+  background: rgba(180, 35, 24, 0.14);
+}
+
+.btn-danger-soft.is-cancelled {
+  cursor: default;
+  opacity: 0.65;
 }
 
 .order-item,

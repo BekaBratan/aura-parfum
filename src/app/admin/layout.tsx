@@ -101,6 +101,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               key={link.href}
               href={link.href}
               onClick={() => setSideOpen(false)}
+              aria-current={pathname === link.href ? "page" : undefined}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors ${pathname === link.href ? "bg-[var(--gold)]/10 text-[var(--gold)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5"}`}
             >
               <link.icon size={18} /> {link.label}
@@ -126,7 +127,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             <ExternalLink size={18} /> Главная страница
           </a>
-          <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 transition-colors cursor-pointer w-full px-4 py-2">
+          <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-[var(--color-danger)] hover:opacity-80 transition-opacity cursor-pointer w-full px-4 py-2">
             <LogOut size={18} /> Выйти
           </button>
         </div>

@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { CATEGORY_LABELS, UNIT_LABELS, GENDER_LABELS } from "@/lib/utils";
 import { formatKzt, convertToKzt } from "@/lib/currency";
 import { Product, ProductCategory } from "@/types";
+import Pagination from "@/components/ui/Pagination";
 import { COUNTRIES as FALLBACK_COUNTRIES } from "@/lib/countries";
 import { useCurrencyStore } from "@/store/currencyStore";
 
@@ -179,6 +180,13 @@ export default function AdminProducts() {
   const [filterGender, setFilterGender] = useState<string>("all");
   const [filterCountry, setFilterCountry] = useState<string>("all");
   const [filterFeatured, setFilterFeatured] = useState(false);
+  const [showAllCountries, setShowAllCountries] = useState(false);
+  const [showAllAccessoryTypes, setShowAllAccessoryTypes] = useState(false);
+  const ADMIN_FILTER_LIMIT = 6;
+  const [adminPage, setAdminPage] = useState(1);
+  const ADMIN_PAGE_SIZE = 20;
+
+  const resetPage = () => setAdminPage(1);
 
   // Dynamic options from current category
   const catProducts = useMemo(
@@ -591,12 +599,18 @@ export default function AdminProducts() {
                     className={`admin-filter-pill${filterAccessoryType === "all" ? " is-active" : ""}`}>
                     Все
                   </button>
-                  {accessoryTypes.map((type) => (
+                  {(showAllAccessoryTypes ? accessoryTypes : accessoryTypes.slice(0, ADMIN_FILTER_LIMIT)).map((type) => (
                     <button key={type} onClick={() => setFilterAccessoryType(type)}
                       className={`admin-filter-pill${filterAccessoryType === type ? " is-active" : ""}`}>
                       {type}
                     </button>
                   ))}
+                  {accessoryTypes.length > ADMIN_FILTER_LIMIT && (
+                    <button onClick={() => setShowAllAccessoryTypes((v) => !v)}
+                      className="admin-filter-pill" style={{ borderStyle: "dashed", opacity: 0.7 }}>
+                      {showAllAccessoryTypes ? "Скрыть" : `+${accessoryTypes.length - ADMIN_FILTER_LIMIT}`}
+                    </button>
+                  )}
                 </div>
               </div>
             </>
@@ -653,12 +667,18 @@ export default function AdminProducts() {
                     className={`admin-filter-pill${filterCountry === "all" ? " is-active" : ""}`}>
                     Все
                   </button>
-                  {availableCountries.map((c) => (
+                  {(showAllCountries ? availableCountries : availableCountries.slice(0, ADMIN_FILTER_LIMIT)).map((c) => (
                     <button key={c} onClick={() => setFilterCountry(c)}
                       className={`admin-filter-pill${filterCountry === c ? " is-active" : ""}`}>
                       {c}
                     </button>
                   ))}
+                  {availableCountries.length > ADMIN_FILTER_LIMIT && (
+                    <button onClick={() => setShowAllCountries((v) => !v)}
+                      className="admin-filter-pill" style={{ borderStyle: "dashed", opacity: 0.7 }}>
+                      {showAllCountries ? "Скрыть" : `+${availableCountries.length - ADMIN_FILTER_LIMIT}`}
+                    </button>
+                  )}
                   {hasProductsWithoutCountry && (
                     <button onClick={() => setFilterCountry("__empty__")}
                       className={`admin-filter-pill${filterCountry === "__empty__" ? " is-active" : ""}`}>
@@ -693,6 +713,7 @@ export default function AdminProducts() {
       ) : filteredProducts.length === 0 ? (
         <p className="text-[var(--text-secondary)] text-center py-12">{products.length === 0 ? "Нет товаров" : "Ничего не найдено"}</p>
       ) : (
+        <>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -708,7 +729,7 @@ export default function AdminProducts() {
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((product) => {
+              {filteredProducts.slice((adminPage - 1) * ADMIN_PAGE_SIZE, adminPage * ADMIN_PAGE_SIZE).map((product) => {
                 const productCount = Number(product.count ?? 0);
                 const isAvailable = productCount > 0;
                 const unit = product.unit ?? "pcs";
@@ -761,6 +782,17 @@ export default function AdminProducts() {
             </tbody>
           </table>
         </div>
+
+        {/* Admin pagination */}
+        <Pagination
+          page={adminPage}
+          total={filteredProducts.length}
+          pageSize={ADMIN_PAGE_SIZE}
+          variant="dark"
+          className="mt-4"
+          onChange={setAdminPage}
+        />
+        </>
       )}
 
       {modalOpen && isAdmin && (

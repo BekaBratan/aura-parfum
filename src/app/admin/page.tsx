@@ -173,7 +173,7 @@ export default function AdminDashboard() {
 
           {/* Low stock alert */}
           {!loading && (stats?.lowStockProducts ?? 0) > 0 && (
-            <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-2 text-yellow-400 text-xs">
+            <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-2 text-[var(--gold)] text-xs">
               <AlertTriangle size={14} />
               <span>{stats!.lowStockProducts} товаров нет в наличии</span>
               <Link href="/admin/products" className="ml-auto underline hover:text-yellow-300">Открыть</Link>

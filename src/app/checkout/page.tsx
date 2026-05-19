@@ -263,7 +263,7 @@ export default function CheckoutPage() {
                 value={form.customer_phone}
                 onChange={handleChange}
                 placeholder="+7 (777) 777 7777"
-                className={`input ${form.customer_phone && !isPhoneValid(form.customer_phone) ? "border-red-500/60" : ""}`}
+                className={`input ${form.customer_phone && !isPhoneValid(form.customer_phone) ? "border-[var(--color-danger)]" : ""}`}
                 required
               />
               {form.customer_phone && !isPhoneValid(form.customer_phone) && (

@@ -437,8 +437,7 @@ export default function InvoicePage() {
               <button
                 onClick={sendToWhatsApp}
                 disabled={pdfGenerating}
-                className="btn"
-                style={{ background: "#25D366", color: "#fff", borderColor: "#25D366" }}
+                className="btn btn-whatsapp"
               >
                 <Send size={17} />
                 Отправить в WhatsApp
@@ -453,8 +452,7 @@ export default function InvoicePage() {
                 <button
                   onClick={cancelOrder}
                   disabled={cancelling}
-                  className="btn"
-                  style={{ background: "rgba(220,38,38,0.1)", color: "#f87171", border: "1px solid rgba(220,38,38,0.3)" }}
+                  className="btn btn-danger-soft"
                 >
                   {cancelling ? <Loader2 size={17} className="animate-spin" /> : <XCircle size={17} />}
                   {cancelling ? "Отмена..." : "Отменить заказ"}
@@ -462,7 +460,7 @@ export default function InvoicePage() {
               )}
 
               {order.order_status === "cancelled" && (
-                <div className="btn" style={{ background: "rgba(220,38,38,0.08)", color: "#f87171", border: "1px solid rgba(220,38,38,0.2)", cursor: "default", opacity: 0.7 }}>
+                <div className="btn btn-danger-soft is-cancelled">
                   <XCircle size={17} />
                   Заказ отменён
                 </div>

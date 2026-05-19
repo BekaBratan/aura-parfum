@@ -5,6 +5,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Product, FilterState, ProductCategory } from "@/types";
 import ProductCard from "@/components/product/ProductCard";
+import Pagination from "@/components/ui/Pagination";
 import {
   Grid2X2,
   List,
@@ -73,6 +74,13 @@ function CatalogContent() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAllBrands, setShowAllBrands] = useState(false);
+  const [showAllCountries, setShowAllCountries] = useState(false);
+  const [showAllAttrs, setShowAllAttrs] = useState<Record<string, boolean>>({});
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 24;
+
+  const FILTER_SHOW_LIMIT = 8;
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<CatalogViewMode>("grid");
 
@@ -322,8 +330,10 @@ function CatalogContent() {
     });
   }, []);
 
-  const clearFilters = () =>
+  const clearFilters = () => {
     setFilters({ ...DEFAULT_FILTERS, category: activeCategory, sortBy: filters.sortBy });
+    setPage(1);
+  };
 
   const hasActiveFilters =
     filters.brands.length > 0 ||
@@ -470,7 +480,7 @@ function CatalogContent() {
             <div>
               <h4 className="filter-title">Бренд</h4>
               <div className="filter-options">
-                {brands.map((brand) => (
+                {(showAllBrands ? brands : brands.slice(0, FILTER_SHOW_LIMIT)).map((brand) => (
                   <button
                     key={brand}
                     onClick={() => toggleBrand(brand)}
@@ -479,6 +489,15 @@ function CatalogContent() {
                     {brand}
                   </button>
                 ))}
+                {brands.length > FILTER_SHOW_LIMIT && (
+                  <button
+                    onClick={() => setShowAllBrands((v) => !v)}
+                    className="chip"
+                    style={{ borderStyle: "dashed", color: "var(--color-muted)" }}
+                  >
+                    {showAllBrands ? "Скрыть" : `+${brands.length - FILTER_SHOW_LIMIT} ещё`}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -488,7 +507,7 @@ function CatalogContent() {
             <div>
               <h4 className="filter-title">Страна происхождения</h4>
               <div className="filter-options">
-                {countryOptions.map((country) => (
+                {(showAllCountries ? countryOptions : countryOptions.slice(0, FILTER_SHOW_LIMIT)).map((country) => (
                   <button
                     key={country}
                     onClick={() => toggleCountry(country)}
@@ -497,6 +516,15 @@ function CatalogContent() {
                     {country}
                   </button>
                 ))}
+                {countryOptions.length > FILTER_SHOW_LIMIT && (
+                  <button
+                    onClick={() => setShowAllCountries((v) => !v)}
+                    className="chip"
+                    style={{ borderStyle: "dashed", color: "var(--color-muted)" }}
+                  >
+                    {showAllCountries ? "Скрыть" : `+${countryOptions.length - FILTER_SHOW_LIMIT} ещё`}
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -506,11 +534,13 @@ function CatalogContent() {
             const options = attrOptions[key] ?? [];
             if (!options.length) return null;
             const active = filters.attributeFilters[key] ?? [];
+            const showAll = showAllAttrs[key] ?? false;
+            const visible = showAll ? options : options.slice(0, FILTER_SHOW_LIMIT);
             return (
               <div key={key}>
                 <h4 className="filter-title">{label}</h4>
                 <div className="filter-options">
-                  {options.map((val) => (
+                  {visible.map((val) => (
                     <button
                       key={val}
                       onClick={() => toggleAttr(key, val)}
@@ -519,6 +549,15 @@ function CatalogContent() {
                       {val}
                     </button>
                   ))}
+                  {options.length > FILTER_SHOW_LIMIT && (
+                    <button
+                      onClick={() => setShowAllAttrs((prev) => ({ ...prev, [key]: !showAll }))}
+                      className="chip"
+                      style={{ borderStyle: "dashed", color: "var(--color-muted)" }}
+                    >
+                      {showAll ? "Скрыть" : `+${options.length - FILTER_SHOW_LIMIT} ещё`}
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -623,15 +662,26 @@ function CatalogContent() {
             </div>
           </div>
         ) : (
-          <div
-            className={`${
-              viewMode === "list" ? "product-list" : "product-grid compact-grid"
-            } catalog-results`}
-          >
-            {filtered.map((product) => (
-              <ProductCard key={product.id} product={product} variant={viewMode} />
-            ))}
-          </div>
+          <>
+            <div
+              className={`${
+                viewMode === "list" ? "product-list" : "product-grid compact-grid"
+              } catalog-results`}
+            >
+              {filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((product) => (
+                <ProductCard key={product.id} product={product} variant={viewMode} />
+              ))}
+            </div>
+
+            {/* Pagination */}
+            <Pagination
+              page={page}
+              total={filtered.length}
+              pageSize={PAGE_SIZE}
+              className="catalog-pagination"
+              onChange={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            />
+          </>
         )}
       </div>
     </div>
