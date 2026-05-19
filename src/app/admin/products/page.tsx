@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { CATEGORY_LABELS, UNIT_LABELS, GENDER_LABELS } from "@/lib/utils";
 import { formatKzt, convertToKzt } from "@/lib/currency";
 import { Product, ProductCategory } from "@/types";
-import { COUNTRIES } from "@/lib/countries";
+import { COUNTRIES as FALLBACK_COUNTRIES } from "@/lib/countries";
 import { useCurrencyStore } from "@/store/currencyStore";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -68,11 +68,7 @@ const GENDER_OPTIONS = [
   { value: "women",  label: "Женский" },
 ];
 
-const QUALITY_OPTIONS = [
-  { value: "", label: "— не указано —" },
-  { value: "De Luxe",  label: "De Luxe" },
-  { value: "Premium",  label: "Premium" },
-];
+const DEFAULT_QUALITY_OPTIONS = ["De Luxe", "Premium"];
 
 // ─── Image helpers ─────────────────────────────────────────────────────────
 
@@ -159,6 +155,9 @@ export default function AdminProducts() {
   const { role } = useAdminRole();
   const isAdmin = role === "admin";
   const kztRate = useCurrencyStore((s) => s.kztRate);
+
+  const [countries, setCountries] = useState<string[]>(FALLBACK_COUNTRIES);
+  const [qualityOptions, setQualityOptions] = useState<string[]>(DEFAULT_QUALITY_OPTIONS);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -271,7 +270,17 @@ export default function AdminProducts() {
     setLoading(false);
   }
 
-  useEffect(() => { loadProducts(); }, []);
+  useEffect(() => {
+    void loadProducts();
+    fetch("/api/admin/options").then(async (r) => {
+      if (!r.ok) return;
+      const opts: { type: string; value: string }[] = await r.json();
+      const c = opts.filter((o) => o.type === "country").map((o) => o.value).sort();
+      const q = opts.filter((o) => o.type === "quality").map((o) => o.value);
+      if (c.length) setCountries(c);
+      if (q.length) setQualityOptions(q);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     return () => { if (selectedImagePreviewUrl) URL.revokeObjectURL(selectedImagePreviewUrl); };
@@ -864,8 +873,9 @@ export default function AdminProducts() {
                             onChange={(e) => handleAttrChange(key, e.target.value)}
                             className="input-dark"
                           >
-                            {QUALITY_OPTIONS.map((o) => (
-                              <option key={o.value} value={o.value}>{o.label}</option>
+                            <option value="">— не указано —</option>
+                            {qualityOptions.map((v) => (
+                              <option key={v} value={v}>{v}</option>
                             ))}
                           </select>
                         ) : (
@@ -895,7 +905,7 @@ export default function AdminProducts() {
                     className="input-dark"
                   >
                     <option value="">— не указана —</option>
-                    {COUNTRIES.map((c) => (
+                    {countries.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
