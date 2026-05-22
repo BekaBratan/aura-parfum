@@ -2,9 +2,18 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import ProductCard from "@/components/product/ProductCard";
 import { Product } from "@/types";
+import { applyStockOverlay, fetchAinurStockMapServer } from "@/lib/ainur/stockOverlay";
 import { ArrowRight, Sparkles, Truck, ShieldCheck } from "lucide-react";
 
 export const revalidate = 60;
+
+async function getStockMapSafe() {
+  try {
+    return await fetchAinurStockMapServer();
+  } catch {
+    return null;
+  }
+}
 
 async function getFeaturedProducts(): Promise<Product[]> {
   try {
@@ -36,10 +45,13 @@ async function getNewProducts(): Promise<Product[]> {
 }
 
 export default async function HomePage() {
-  const [featured, newest] = await Promise.all([
+  const [featuredRaw, newestRaw, stockMap] = await Promise.all([
     getFeaturedProducts(),
     getNewProducts(),
+    getStockMapSafe(),
   ]);
+  const featured = stockMap ? applyStockOverlay(featuredRaw, stockMap) : featuredRaw;
+  const newest = stockMap ? applyStockOverlay(newestRaw, stockMap) : newestRaw;
 
   const benefits = [
     {

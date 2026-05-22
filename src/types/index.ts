@@ -18,6 +18,7 @@ export interface Product {
   attributes: Record<string, string | string[]>;
   min_volume: number | null;
   country_of_origin: string | null;
+  ainur_id?: string | null;
 }
 
 export interface OrderItem {
@@ -30,6 +31,9 @@ export interface OrderItem {
   image_url: string | null;
   unit: ProductUnit;
   category: ProductCategory;
+  attributes?: Record<string, string | string[]> | null;
+  gender?: string | null;
+  country_of_origin?: string | null;
 }
 
 export interface Order {

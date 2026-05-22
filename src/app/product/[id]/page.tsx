@@ -1,19 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
-import { formatPriceUsd, formatPricePerUnit, getProductPrice, UNIT_LABELS, GENDER_LABELS } from "@/lib/utils";
+import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice, GENDER_LABELS } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
 import { formatUsd } from "@/lib/currency";
 import { COUNTRY_CODES } from "@/lib/countries";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { ShoppingBag, ArrowLeft, Check, X as XIcon } from "lucide-react";
-import MlInput from "@/components/ui/MlInput";
+import QuantityControls from "@/components/ui/QuantityControls";
 import toast from "react-hot-toast";
 
 const ATTRIBUTE_LABELS: Record<string, string> = {
@@ -37,7 +38,6 @@ export default function ProductPage() {
   const addItem = useCartStore((s) => s.addItem);
   const cartItems = useCartStore((s) => s.items);
   const kztRate = useCurrencyStore((s) => s.kztRate);
-  const router = useRouter();
 
   const productCount = Number(product?.count ?? 0);
   const isAvailable = productCount > 0;
@@ -46,21 +46,33 @@ export default function ProductPage() {
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("products")
-        .select("*")
-        .eq("id", id)
-        .single();
-      setProduct(data as Product | null);
-      setLoading(false);
+      try {
+        const supabase = createClient();
+        const [{ data }, stockMap] = await Promise.all([
+          supabase.from("products").select("*").eq("id", id).single(),
+          fetchAinurStockMap().catch(() => null),
+        ]);
+        const p = data as Product | null;
+        setProduct(p && stockMap ? applyStockOverlay([p], stockMap)[0] : p);
+      } catch (err) {
+        console.error("Не удалось загрузить товар:", err);
+        setProduct(null);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [id]);
 
   useEffect(() => {
-    if (product) setChosenVolume(product.min_volume ?? 1);
-  }, [product?.id, product?.min_volume]);
+    if (!product) return;
+    const existing = cartItems.find((i) => i.product_id === product.id);
+    if (existing) {
+      setChosenVolume(existing.quantity);
+    } else {
+      setChosenVolume(product.min_volume ?? 1);
+    }
+  }, [product?.id, product?.min_volume, cartItems]);
 
   useEffect(() => {
     setImageError(false);
@@ -68,7 +80,7 @@ export default function ProductPage() {
 
   const handleAdd = () => {
     if (!product || !isAvailable) return;
-    const qty = isMl ? chosenVolume : 1;
+    const qty = chosenVolume;
     addItem({
       product_id: product.id,
       name: product.name,
@@ -80,6 +92,9 @@ export default function ProductPage() {
       unit: product.unit ?? "pcs",
       category: product.category ?? "accessory",
       quantity: qty,
+      attributes: product.attributes ?? null,
+      gender: product.gender ?? null,
+      country_of_origin: product.country_of_origin ?? null,
     });
     const totalKzt = formatPriceUsd(priceUsd * qty, kztRate);
     const label = isMl ? `${qty} мл → ${totalKzt}` : product.name;
@@ -122,9 +137,7 @@ export default function ProductPage() {
     isMl ? priceUsd * chosenVolume : priceUsd,
     kztRate
   );
-  const availabilityText = isAvailable
-    ? `В наличии: ${productCount} ${UNIT_LABELS[product.unit ?? "pcs"]}`
-    : "Нет в наличии";
+  const availabilityText = isAvailable ? "В наличии" : "Нет в наличии";
 
   const allowedKeys = ALLOWED_ATTRIBUTES[product.category ?? "perfume"] ?? [];
 
@@ -256,58 +269,54 @@ export default function ProductPage() {
               )}
             </div>
 
-            {/* Volume selector for ml products */}
-            {isMl && (
+            {/* Volume / quantity selector */}
+            {isAvailable && (
               <div className="volume-selector">
                 <label className="volume-selector-label">
-                  Объём, мл
-                  <span className="volume-selector-hint">
-                    доступно: {productCount} мл
-                  </span>
+                  {isMl ? "Объём, мл" : "Количество"}
                 </label>
                 <div className="volume-selector-row">
-                  <MlInput
+                  <QuantityControls
                     value={chosenVolume}
-                    min={minVolume}
+                    min={isMl ? minVolume : 1}
                     max={productCount}
-                    disabled={!isAvailable}
+                    unit={product.unit ?? "pcs"}
                     onChange={setChosenVolume}
-                    className="input volume-input"
-                    aria-label="Объём в мл"
+                    onLimitExceeded={() =>
+                      toast.error(`Превышен лимит запаса: ${product.name}`, { id: "stock-limit" })
+                    }
+                    size="md"
                   />
-                  <span className="volume-unit">мл</span>
-                  {isAvailable && (
-                    <span className="volume-total">= {totalKzt}</span>
-                  )}
+                  <span className="volume-total">= {totalKzt}</span>
                 </div>
               </div>
             )}
 
-            {isMl && isInCart && (
+            {isInCart && (
               <div className="detail-in-cart-notice">
                 <Check size={14} />
-                <span>В корзине: {cartItem!.quantity} мл</span>
+                <span>В корзине: {cartItem!.quantity} {isMl ? "мл" : "шт"}</span>
                 <Link href="/cart" className="detail-cart-link">Перейти в корзину →</Link>
               </div>
             )}
 
             <button
-              onClick={!isMl && isInCart ? () => router.push("/cart") : handleAdd}
+              onClick={handleAdd}
               disabled={
                 !isAvailable ||
-                (isMl && (chosenVolume < minVolume || chosenVolume > productCount))
+                chosenVolume < (isMl ? minVolume : 1) ||
+                chosenVolume > productCount
               }
-              className={`btn ${!isMl && isInCart ? "product-detail-in-cart-btn" : isAvailable ? "btn-primary" : "btn-secondary"}`}
+              className={`btn ${isAvailable ? "btn-primary" : "btn-secondary"}`}
             >
-              {!isMl && isInCart ? (
-                <><Check size={18} />В корзине</>
-              ) : (
-                <><ShoppingBag size={18} />{!isAvailable
-                  ? "Нет в наличии"
-                  : isMl
-                  ? (isInCart ? `Обновить — ${chosenVolume} мл` : `В корзину — ${chosenVolume} мл`)
-                  : "Добавить в корзину"}</>
-              )}
+              <ShoppingBag size={18} />
+              {!isAvailable
+                ? "Нет в наличии"
+                : isInCart
+                ? `Обновить — ${chosenVolume} ${isMl ? "мл" : "шт"}`
+                : isMl
+                ? `В корзину — ${chosenVolume} мл`
+                : `В корзину — ${chosenVolume} шт`}
             </button>
           </div>
         </div>

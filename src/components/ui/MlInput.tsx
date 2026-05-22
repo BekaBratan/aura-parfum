@@ -10,6 +10,7 @@ interface MlInputProps {
   className?: string;
   "aria-label"?: string;
   onChange: (value: number) => void;
+  onLimitExceeded?: () => void;
 }
 
 /**
@@ -25,6 +26,7 @@ export default function MlInput({
   disabled,
   className,
   onChange,
+  onLimitExceeded,
   ...rest
 }: MlInputProps) {
   const [draft, setDraft] = useState(String(value));
@@ -37,10 +39,18 @@ export default function MlInput({
   const handleChange = (raw: string) => {
     // Allow empty string and digits only while typing
     const cleaned = raw.replace(/\D/g, "");
+    const n = parseInt(cleaned, 10);
+
+    // If user typed a number above max, reject it: revert draft to the last valid value
+    if (!isNaN(n) && max !== undefined && n > max) {
+      setDraft(String(value));
+      onLimitExceeded?.();
+      return;
+    }
+
     setDraft(cleaned);
 
-    const n = parseInt(cleaned, 10);
-    if (!isNaN(n) && n >= min && (max === undefined || n <= max)) {
+    if (!isNaN(n) && n >= min) {
       onChange(n);
     }
   };
@@ -48,11 +58,12 @@ export default function MlInput({
   const handleBlur = () => {
     const n = parseInt(draft, 10);
     if (isNaN(n) || n < min) {
-      setDraft(String(min));
-      onChange(min);
+      // Empty/too-small → restore last valid value (don't reset to min)
+      setDraft(String(value));
     } else if (max !== undefined && n > max) {
-      setDraft(String(max));
-      onChange(max);
+      // Out of range → restore last valid value, notify
+      setDraft(String(value));
+      onLimitExceeded?.();
     } else {
       setDraft(String(n));
     }

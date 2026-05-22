@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ImageIcon, Loader2, Pencil, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
+import { ImageIcon, Link2, Link2Off, Loader2, Pencil, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAdminRole } from "@/lib/adminRole";
 import { createClient } from "@/lib/supabase/client";
@@ -12,6 +12,8 @@ import { Product, ProductCategory } from "@/types";
 import Pagination from "@/components/ui/Pagination";
 import { COUNTRIES as FALLBACK_COUNTRIES } from "@/lib/countries";
 import { useCurrencyStore } from "@/store/currencyStore";
+import AinurPicker from "@/components/admin/AinurPicker";
+import type { AdminAinurProduct } from "@/app/api/admin/ainur-products/route";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +30,8 @@ interface FormState {
   is_featured: boolean;
   attributes: Record<string, string>;
   country_of_origin: string;
+  ainur_id: string | null;
+  ainur_name: string | null;
 }
 
 const emptyProduct: FormState = {
@@ -43,6 +47,8 @@ const emptyProduct: FormState = {
   is_featured: false,
   attributes: {},
   country_of_origin: "",
+  ainur_id: null,
+  ainur_name: null,
 };
 
 // ─── Category-specific attribute field configs ─────────────────────────────
@@ -170,6 +176,8 @@ export default function AdminProducts() {
   const [selectedImagePreviewUrl, setSelectedImagePreviewUrl] = useState<string | null>(null);
   const [previewImageError, setPreviewImageError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [ainurPickerOpen, setAinurPickerOpen] = useState(false);
+  const [ainurStockById, setAinurStockById] = useState<Record<string, number>>({});
 
   // ─── Filter state ──────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -180,6 +188,7 @@ export default function AdminProducts() {
   const [filterGender, setFilterGender] = useState<string>("all");
   const [filterCountry, setFilterCountry] = useState<string>("all");
   const [filterFeatured, setFilterFeatured] = useState(false);
+  const [filterAinurLink, setFilterAinurLink] = useState<"all" | "linked" | "unlinked" | "stale">("all");
   const [showAllCountries, setShowAllCountries] = useState(false);
   const [showAllAccessoryTypes, setShowAllAccessoryTypes] = useState(false);
   const ADMIN_FILTER_LIMIT = 6;
@@ -231,8 +240,12 @@ export default function AdminProducts() {
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       if (filterCategory !== "all" && p.category !== filterCategory) return false;
-      if (filterStock === "in" && Number(p.count ?? 0) === 0) return false;
-      if (filterStock === "out" && Number(p.count ?? 0) > 0) return false;
+      // Stock filter uses the effective count (Ainur if linked, Supabase otherwise)
+      const effectiveCount = p.ainur_id && p.ainur_id in ainurStockById
+        ? ainurStockById[p.ainur_id]
+        : Number(p.count ?? 0);
+      if (filterStock === "in" && effectiveCount === 0) return false;
+      if (filterStock === "out" && effectiveCount > 0) return false;
       if (filterCategory !== "accessory") {
         if (filterQuality === "deluxe" && p.attributes?.quality !== "De Luxe") return false;
         if (filterQuality === "premium" && p.attributes?.quality !== "Premium") return false;
@@ -248,13 +261,16 @@ export default function AdminProducts() {
         if (filterCountry === "__empty__" ? Boolean(p.country_of_origin) : p.country_of_origin !== filterCountry) return false;
       }
       if (filterFeatured && !p.is_featured) return false;
+      if (filterAinurLink === "linked" && !(p.ainur_id && p.ainur_id in ainurStockById)) return false;
+      if (filterAinurLink === "unlinked" && p.ainur_id) return false;
+      if (filterAinurLink === "stale" && !(p.ainur_id && !(p.ainur_id in ainurStockById))) return false;
       if (search) {
         const q = search.toLowerCase();
         if (!p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q)) return false;
       }
       return true;
     });
-  }, [products, search, filterCategory, filterStock, filterQuality, filterAccessoryType, filterGender, filterCountry, filterFeatured]);
+  }, [products, search, filterCategory, filterStock, filterQuality, filterAccessoryType, filterGender, filterCountry, filterFeatured, filterAinurLink, ainurStockById]);
 
   const supabase = createClient();
   const imagePreviewSrc = selectedImagePreviewUrl || form.image_url.trim();
@@ -287,6 +303,16 @@ export default function AdminProducts() {
       const q = opts.filter((o) => o.type === "quality").map((o) => o.value);
       if (c.length) setCountries(c);
       if (q.length) setQualityOptions(q);
+    }).catch(() => {});
+
+    // Pull Ainur stock map once so the admin table can show live counts
+    fetch("/api/admin/ainur-products").then(async (r) => {
+      if (!r.ok) return;
+      const json = (await r.json()) as { data?: AdminAinurProduct[] };
+      if (!json.data) return;
+      const map: Record<string, number> = {};
+      for (const p of json.data) map[p.id] = p.stock;
+      setAinurStockById(map);
     }).catch(() => {});
   }, []);
 
@@ -322,6 +348,8 @@ export default function AdminProducts() {
       count: String(product.count ?? 0),
       is_featured: product.is_featured,
       country_of_origin: product.country_of_origin ?? "",
+      ainur_id: product.ainur_id ?? null,
+      ainur_name: null, // resolved by the picker / displayed only after re-pick
       attributes: Object.fromEntries(
         Object.entries(product.attributes ?? {}).map(([k, v]) => [
           k,
@@ -331,6 +359,33 @@ export default function AdminProducts() {
     });
     resetSelectedImage();
     setModalOpen(true);
+  };
+
+  // Memoized set of ainur_ids already linked to *other* Supabase products,
+  // so the picker can mark them as taken.
+  const takenAinurIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of products) {
+      if (p.ainur_id && p.id !== editId) ids.add(p.ainur_id);
+    }
+    return ids;
+  }, [products, editId]);
+
+  const handleAinurPick = (a: AdminAinurProduct) => {
+    setForm((prev) => ({
+      ...prev,
+      ainur_id: a.id,
+      ainur_name: a.name,
+      // Prefill name/price/count for new products if the operator hasn't typed anything yet
+      name: prev.name || a.name,
+      price: prev.price || (prev.category === "accessory" ? String(Math.round(a.price)) : prev.price),
+      count: prev.count || String(a.stock),
+    }));
+    setAinurPickerOpen(false);
+  };
+
+  const handleAinurClear = () => {
+    setForm((prev) => ({ ...prev, ainur_id: null, ainur_name: null }));
   };
 
   const uploadSelectedImage = async () => {
@@ -416,11 +471,18 @@ export default function AdminProducts() {
           ? form.country_of_origin
           : null,
         price_usd: price,
+        ainur_id: form.ainur_id || null,
       };
 
       let saveError = await save(payload);
 
       // Graceful fallbacks for columns that may not exist if migrations haven't been run yet
+      if (saveError?.includes("ainur_id")) {
+        const { ainur_id, ...rest } = payload;
+        payload = rest;
+        toast.error("Колонка ainur_id ещё не создана. Запустите supabase/migrations/ainur_id.sql");
+        saveError = await save(payload);
+      }
       if (saveError?.includes("price_usd")) {
         const { price_usd, ...rest } = payload;
         payload = { ...rest, price: price_usd };
@@ -513,6 +575,16 @@ export default function AdminProducts() {
   const countHelp = isMl ? "Общий запас в мл" : "Если товара нет, поставьте 0";
   const attrFields = CATEGORY_ATTR_FIELDS[form.category];
 
+  // Aggregated stats — total / linked to Ainur / total live stock from Ainur
+  const ainurLinkedCount = useMemo(
+    () => products.filter((p) => p.ainur_id && p.ainur_id in ainurStockById).length,
+    [products, ainurStockById],
+  );
+  const ainurStockTotal = useMemo(
+    () => Object.values(ainurStockById).reduce((sum, n) => sum + (Number(n) || 0), 0),
+    [ainurStockById],
+  );
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -523,6 +595,36 @@ export default function AdminProducts() {
             <span>Добавить</span>
           </button>
         )}
+      </div>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--dark-2)] p-3">
+          <p className="text-xs text-[var(--text-secondary)]">Всего товаров</p>
+          <p className="text-xl font-bold text-[var(--text-primary)] mt-1">{products.length}</p>
+        </div>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--dark-2)] p-3">
+          <p className="text-xs text-[var(--text-secondary)]">Привязано к Ainur</p>
+          <p className="text-xl font-bold text-[var(--gold)] mt-1">
+            {ainurLinkedCount}
+            <span className="text-xs font-medium text-[var(--text-secondary)] ml-2">
+              из {products.length}
+              {products.length > 0 && ` (${Math.round((100 * ainurLinkedCount) / products.length)}%)`}
+            </span>
+          </p>
+        </div>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--dark-2)] p-3">
+          <p className="text-xs text-[var(--text-secondary)]">Остаток в Ainur</p>
+          <p className="text-xl font-bold text-green-400 mt-1">
+            {ainurStockTotal.toLocaleString("ru-RU")}
+          </p>
+        </div>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--dark-2)] p-3">
+          <p className="text-xs text-[var(--text-secondary)]">Товаров в Ainur</p>
+          <p className="text-xl font-bold text-[var(--text-primary)] mt-1">
+            {Object.keys(ainurStockById).length}
+          </p>
+        </div>
       </div>
 
       {/* Search + filters */}
@@ -705,6 +807,28 @@ export default function AdminProducts() {
               </button>
             </div>
           </div>
+
+          <div className="admin-filter-divider" />
+
+          <div className="admin-filter-group">
+            <span className="admin-filter-label">Привязка</span>
+            <div className="admin-filter-pills">
+              {([
+                ["all", "Все"],
+                ["linked", "Привязаны"],
+                ["unlinked", "Не привязаны"],
+                ["stale", "Битая привязка"],
+              ] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setFilterAinurLink(val)}
+                  className={`admin-filter-pill${filterAinurLink === val ? " is-active" : ""}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -725,13 +849,27 @@ export default function AdminProducts() {
                 <th className="pb-3 pr-4 hidden lg:table-cell">Тип</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Цена</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Наличие</th>
+                <th className="pb-3 pr-4 hidden xl:table-cell">Ainur</th>
                 {isAdmin && <th className="pb-3 text-right">Действия</th>}
               </tr>
             </thead>
             <tbody>
               {filteredProducts.slice((adminPage - 1) * ADMIN_PAGE_SIZE, adminPage * ADMIN_PAGE_SIZE).map((product) => {
-                const productCount = Number(product.count ?? 0);
+                const supabaseCount = Number(product.count ?? 0);
+                const linkedAinurId = product.ainur_id ?? null;
+                const ainurCount = linkedAinurId && linkedAinurId in ainurStockById
+                  ? ainurStockById[linkedAinurId]
+                  : null;
+                const isLinked = ainurCount !== null;
+                const productCount = isLinked ? ainurCount! : supabaseCount;
                 const isAvailable = productCount > 0;
+                const stockBadgeClass = isLinked
+                  ? isAvailable
+                    ? "bg-[var(--gold)]/15 text-[var(--gold)] ring-1 ring-[var(--gold)]/40"
+                    : "bg-red-500/10 text-red-400 ring-1 ring-[var(--gold)]/40"
+                  : isAvailable
+                    ? "bg-green-500/10 text-green-400"
+                    : "bg-red-500/10 text-red-400";
                 const unit = product.unit ?? "pcs";
                 const cat = product.category ?? "perfume";
                 return (
@@ -764,9 +902,37 @@ export default function AdminProducts() {
                         : formatKzt(convertToKzt(product.price_usd, kztRate))}{unit === "ml" ? " /мл" : ""}
                     </td>
                     <td className="py-3 pr-4 hidden md:table-cell">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${isAvailable ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                      <span
+                        className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${stockBadgeClass}`}
+                        title={
+                          isLinked
+                            ? `Остаток из Ainur (id: ${linkedAinurId}). В Supabase: ${supabaseCount}`
+                            : "Остаток из Supabase (товар не привязан к Ainur)"
+                        }
+                      >
+                        {isLinked && <Link2 size={11} />}
                         {isAvailable ? `${productCount} ${UNIT_LABELS[unit]}` : "Нет в наличии"}
                       </span>
+                    </td>
+                    <td className="py-3 pr-4 hidden xl:table-cell">
+                      {linkedAinurId ? (
+                        isLinked ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-[var(--gold)]" title={linkedAinurId}>
+                            <Link2 size={12} />
+                            Ainur
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-xs text-amber-400" title={linkedAinurId}>
+                            <Link2 size={12} />
+                            нет в Ainur
+                          </span>
+                        )
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)]">
+                          <Link2Off size={12} />
+                          не привязан
+                        </span>
+                      )}
                     </td>
                     {isAdmin && (
                       <td className="py-3 text-right">
@@ -972,6 +1138,50 @@ export default function AdminProducts() {
                 </label>
               </div>
 
+              {/* Ainur linkage */}
+              <div className="form-group">
+                <label className="form-label">Привязка к Ainur</label>
+                <p className="form-help">Остаток у этого товара в каталоге будет браться из связанного товара Ainur.</p>
+                {form.ainur_id ? (
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex-1 min-w-0 rounded-lg border border-[var(--gold)]/40 bg-[var(--gold)]/5 px-3 py-2">
+                      <p className="text-xs text-[var(--text-secondary)]">Привязан к:</p>
+                      <p className="text-sm text-[var(--text-primary)] truncate">{form.ainur_name ?? form.ainur_id}</p>
+                      <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 truncate">id: {form.ainur_id}</p>
+                      {form.ainur_id in ainurStockById && (
+                        <p className="text-xs text-green-400 mt-1">
+                          Сейчас в Ainur: {ainurStockById[form.ainur_id].toLocaleString("ru-RU")} шт.
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAinurPickerOpen(true)}
+                      className="btn-outline-gold text-xs px-3 py-2 rounded-lg cursor-pointer"
+                    >
+                      Изменить
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAinurClear}
+                      className="text-[var(--text-secondary)] hover:text-red-400 transition-colors p-2 cursor-pointer"
+                      aria-label="Отвязать"
+                    >
+                      <Link2Off size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAinurPickerOpen(true)}
+                    className="btn-outline-gold w-full mt-2 py-2 rounded-lg text-sm flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Link2 size={14} />
+                    Привязать к товару Ainur
+                  </button>
+                )}
+              </div>
+
               {/* Featured toggle */}
               <div className="form-group form-group-inline">
                 <input id="product-featured" type="checkbox" name="is_featured" checked={form.is_featured} onChange={handleChange} className="accent-[var(--gold)] w-4 h-4" />
@@ -988,6 +1198,16 @@ export default function AdminProducts() {
             </div>
           </div>
         </div>
+      )}
+
+      {ainurPickerOpen && (
+        <AinurPicker
+          value={form.ainur_id}
+          takenIds={takenAinurIds}
+          initialSearch={form.name}
+          onPick={handleAinurPick}
+          onClose={() => setAinurPickerOpen(false)}
+        />
       )}
     </div>
   );

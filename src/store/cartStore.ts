@@ -12,6 +12,9 @@ export type CartProductSnapshot = {
   count: number | null;
   unit: ProductUnit;
   category: ProductCategory;
+  attributes?: Record<string, string | string[]> | null;
+  gender?: string | null;
+  country_of_origin?: string | null;
 };
 
 interface CartStore {
@@ -40,19 +43,12 @@ export const useCartStore = create<CartStore>()(
 
         const existing = get().items.find((i) => i.product_id === item.product_id);
 
-        if (existing && item.unit === "pcs") {
+        if (existing) {
+          // Replace existing entry with the new snapshot (sets quantity to the requested value)
           set({
             items: get().items.map((i) =>
               i.product_id === item.product_id
-                ? { ...i, count: availableCount, quantity: Math.min(i.quantity + 1, availableCount) }
-                : i
-            ),
-          });
-        } else if (existing && item.unit === "ml") {
-          set({
-            items: get().items.map((i) =>
-              i.product_id === item.product_id
-                ? { ...item, quantity: safeQty, count: availableCount }
+                ? { ...i, ...item, quantity: safeQty, count: availableCount }
                 : i
             ),
           });
@@ -95,6 +91,9 @@ export const useCartStore = create<CartStore>()(
               count: Number(product.count ?? 0),
               unit: product.unit,
               category: product.category,
+              attributes: product.attributes ?? item.attributes ?? null,
+              gender: product.gender ?? item.gender ?? null,
+              country_of_origin: product.country_of_origin ?? item.country_of_origin ?? null,
             };
           }),
         });

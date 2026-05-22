@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Product, FilterState, ProductCategory } from "@/types";
+import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
 import ProductCard from "@/components/product/ProductCard";
 import Pagination from "@/components/ui/Pagination";
 import {
@@ -64,13 +65,21 @@ function pluralItems(n: number): string {
   return `${n} товаров`;
 }
 
+const DEFAULT_CATEGORY: ProductCategory = CATEGORY_ORDER[0];
+
+function isValidCategory(value: string | null): value is ProductCategory {
+  return value === "oil" || value === "perfume" || value === "accessory";
+}
+
 function CatalogContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  const activeCategory =
-    (searchParams.get("category") as ProductCategory | null) ?? null;
+  const rawCategory = searchParams.get("category");
+  const activeCategory: ProductCategory = isValidCategory(rawCategory)
+    ? rawCategory
+    : DEFAULT_CATEGORY;
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,17 +104,21 @@ function CatalogContent() {
     if (stored === "grid" || stored === "list") setViewMode(stored);
   }, []);
 
-  // Load all products once
+  // Load all products from Supabase, then overlay live stock counts from Ainur.
   useEffect(() => {
     async function load() {
       try {
         const supabase = createClient();
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false });
+        const [{ data, error }, stockMap] = await Promise.all([
+          supabase
+            .from("products")
+            .select("*")
+            .order("created_at", { ascending: false }),
+          fetchAinurStockMap().catch(() => null),
+        ]);
         if (error) throw error;
-        setProducts((data as Product[]) || []);
+        const list = (data as Product[]) || [];
+        setProducts(stockMap ? applyStockOverlay(list, stockMap) : list);
       } catch (err) {
         console.error("Не удалось загрузить товары:", err);
       } finally {
@@ -124,10 +137,18 @@ function CatalogContent() {
     }));
   }, [activeCategory]);
 
-  const handleCategoryChange = (cat: ProductCategory | null) => {
+  // If URL has no category (or an unknown one), normalize to the default
+  useEffect(() => {
+    if (!isValidCategory(rawCategory)) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("category", DEFAULT_CATEGORY);
+      router.replace(`${pathname}?${params.toString()}`);
+    }
+  }, [rawCategory, searchParams, router, pathname]);
+
+  const handleCategoryChange = (cat: ProductCategory) => {
     const params = new URLSearchParams(searchParams.toString());
-    if (cat) params.set("category", cat);
-    else params.delete("category");
+    params.set("category", cat);
     router.push(`${pathname}?${params.toString()}`);
   };
 
@@ -138,10 +159,7 @@ function CatalogContent() {
 
   // Products belonging to the currently selected category (for filter option building)
   const categoryProducts = useMemo(
-    () =>
-      activeCategory
-        ? products.filter((p) => (p.category ?? "perfume") === activeCategory)
-        : products,
+    () => products.filter((p) => (p.category ?? "perfume") === activeCategory),
     [products, activeCategory]
   );
 
@@ -163,7 +181,7 @@ function CatalogContent() {
 
   // Attribute filter config + available options for current category
   const attrFilterConfig = useMemo(
-    () => (activeCategory ? CATEGORY_ATTRIBUTE_FILTERS[activeCategory] : []),
+    () => CATEGORY_ATTRIBUTE_FILTERS[activeCategory] ?? [],
     [activeCategory]
   );
 
@@ -182,8 +200,7 @@ function CatalogContent() {
   }, [genderFilteredProducts, attrFilterConfig]);
 
   // Gender quick-filter — only for oil and perfume
-  const showGenderFilter =
-    activeCategory !== null && CATEGORIES_WITH_GENDER.includes(activeCategory);
+  const showGenderFilter = CATEGORIES_WITH_GENDER.includes(activeCategory);
 
   const genderOptions = useMemo(() => {
     if (!showGenderFilter) return [];
@@ -198,27 +215,22 @@ function CatalogContent() {
 
 
   const activeGenders = filters.attributeFilters["gender"] ?? [];
+  const activeGender = activeGenders[0] ?? null;
 
-  const toggleGender = useCallback((val: string) => {
-    setFilters((prev) => {
-      const current = prev.attributeFilters["gender"] ?? [];
-      return {
-        ...prev,
-        brands: [],
-        countries: [],
-        attributeFilters: {
-          ...prev.attributeFilters,
-          gender: current.includes(val)
-            ? current.filter((v) => v !== val)
-            : [...current, val],
-        },
-      };
-    });
+  const selectGender = useCallback((val: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      brands: [],
+      countries: [],
+      attributeFilters: {
+        ...prev.attributeFilters,
+        gender: [val],
+      },
+    }));
   }, []);
 
   // Country filter options for oil and perfume
-  const showCountryFilter =
-    activeCategory !== null && CATEGORIES_WITH_COUNTRY.includes(activeCategory);
+  const showCountryFilter = CATEGORIES_WITH_COUNTRY.includes(activeCategory);
   const countryOptions = useMemo(() => {
     if (!showCountryFilter) return [];
     return [
@@ -232,9 +244,7 @@ function CatalogContent() {
 
   // Apply all filters
   const filtered = useMemo(() => {
-    let list = activeCategory
-      ? products.filter((p) => (p.category ?? "perfume") === activeCategory)
-      : [...products];
+    let list = products.filter((p) => (p.category ?? "perfume") === activeCategory);
 
     if (filters.search) {
       const q = filters.search.toLowerCase();
@@ -359,14 +369,6 @@ function CatalogContent() {
 
         {/* Category tabs */}
         <div className="catalog-tabs" role="tablist" aria-label="Категории">
-          <button
-            role="tab"
-            aria-selected={activeCategory === null}
-            onClick={() => handleCategoryChange(null)}
-            className={`catalog-tab ${activeCategory === null ? "is-active" : ""}`}
-          >
-            Все
-          </button>
           {CATEGORY_ORDER.map((cat) => (
             <button
               key={cat}
@@ -382,21 +384,14 @@ function CatalogContent() {
 
         {/* Gender quick-filter — above search, only for oil/perfume */}
         {showGenderFilter && genderOptions.length > 0 && (
-          <div className="catalog-tabs catalog-gender-tabs" role="group" aria-label="Пол">
-            <button
-              className={`catalog-tab ${activeGenders.length === 0 ? "is-active" : ""}`}
-              onClick={() => setFilters((prev) => ({
-                ...prev,
-                attributeFilters: { ...prev.attributeFilters, gender: [] },
-              }))}
-            >
-              Все
-            </button>
+          <div className="catalog-tabs catalog-gender-tabs" role="radiogroup" aria-label="Пол">
             {genderOptions.map((g) => (
               <button
                 key={g}
-                className={`catalog-tab ${activeGenders.includes(g) ? "is-active" : ""}`}
-                onClick={() => toggleGender(g)}
+                role="radio"
+                aria-checked={activeGender === g}
+                className={`catalog-tab ${activeGender === g ? "is-active" : ""}`}
+                onClick={() => selectGender(g)}
               >
                 {GENDER_LABELS[g] ?? g}
               </button>

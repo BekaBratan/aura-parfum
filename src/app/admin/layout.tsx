@@ -15,6 +15,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const pathname = usePathname();
 
+  // Auto-close sidebar on navigation (so route changes don't leave it open).
+  useEffect(() => {
+    setSideOpen(false);
+  }, [pathname]);
+
+  // Lock body scroll while sidebar is open (matches the public navbar behavior).
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.body.style.overflow = sideOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [sideOpen]);
+
   useEffect(() => {
     const supabase = createClient();
 
@@ -84,16 +98,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <AdminRoleProvider role={staffRole}>
-      {/* Mobile overlay */}
-      {sideOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSideOpen(false)} />
-      )}
+      {/* Backdrop — visible whenever the sidebar is open, on any screen size */}
+      <div
+        onClick={() => setSideOpen(false)}
+        aria-hidden={!sideOpen}
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 ${
+          sideOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+      />
 
-      {/* Sidebar — always fixed, independent scroll */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[var(--dark-2)] border-r border-[var(--border)] flex flex-col transition-transform duration-300 ${sideOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+      {/* Sidebar — collapsed by default on every screen; slides in when toggled */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-[var(--dark-2)] border-r border-[var(--border)] flex flex-col transition-transform duration-300 ${
+          sideOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="p-6 flex items-center justify-between shrink-0">
           <Link href="/admin" className="text-xl font-bold text-gold-gradient" style={{ fontFamily: "'Playfair Display', serif" }}>AZ-ZAHRA Admin</Link>
-          <button onClick={() => setSideOpen(false)} className="lg:hidden text-[var(--text-secondary)] cursor-pointer"><X size={20} /></button>
+          <button
+            onClick={() => setSideOpen(false)}
+            aria-label="Закрыть меню"
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+          >
+            <X size={20} />
+          </button>
         </div>
         <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
           {links.map((link) => (
@@ -133,10 +161,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Main content — offset by sidebar width on desktop */}
-      <div className="lg:pl-64 min-h-screen flex flex-col">
-        <header className="h-16 border-b border-[var(--border)] bg-[var(--dark-2)] flex items-center px-4 lg:px-8 gap-4 sticky top-0 z-30">
-          <button onClick={() => setSideOpen(true)} className="lg:hidden text-[var(--text-secondary)] cursor-pointer"><Menu size={22} /></button>
+      {/* Main content — full width on every screen */}
+      <div className="min-h-screen flex flex-col">
+        <header className="h-16 border-b border-[var(--border)] bg-[var(--dark-2)] flex items-center px-4 sm:px-6 lg:px-8 gap-4 sticky top-0 z-30">
+          <button
+            onClick={() => setSideOpen((open) => !open)}
+            aria-label={sideOpen ? "Закрыть меню" : "Открыть меню"}
+            aria-expanded={sideOpen}
+            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+          >
+            <Menu size={22} />
+          </button>
           <h2 className="text-sm font-medium text-[var(--text-primary)]">Панель управления · {roleLabel}</h2>
           <div className="ml-auto flex items-center gap-2">
             <div className="w-7 h-7 rounded-full bg-[var(--gold)]/20 flex items-center justify-center text-[var(--gold)] font-bold text-xs uppercase shrink-0">

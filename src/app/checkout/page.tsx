@@ -35,8 +35,7 @@ function getStockIssueMessage(issue: StockIssue) {
     return `Товар закончился: ${issue.item.name}. Удалите его из корзины.`;
   }
 
-  const unitLabel = UNIT_LABELS[issue.item.unit ?? "pcs"];
-  return `Недостаточно товара в наличии: ${issue.item.name}. В корзине: ${issue.item.quantity} ${unitLabel}, доступно: ${issue.availableCount} ${unitLabel}.`;
+  return `Превышен лимит запаса: ${issue.item.name}. Уменьшите количество в корзине.`;
 }
 
 export default function CheckoutPage() {

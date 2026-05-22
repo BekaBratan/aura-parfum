@@ -4,14 +4,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
-import { formatPriceUsd, UNIT_LABELS, itemPriceKzt } from "@/lib/utils";
+import { Product } from "@/types";
+import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
+import { itemPriceKzt } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
 import Image from "next/image";
 import Link from "next/link";
-import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
-import MlInput from "@/components/ui/MlInput";
+import { Trash2, ShoppingBag, ArrowRight } from "lucide-react";
+import QuantityControls from "@/components/ui/QuantityControls";
+import { COUNTRY_CODES } from "@/lib/countries";
+import { GENDER_LABELS } from "@/lib/utils";
 import { CartItem } from "@/types";
+
+const CATEGORY_NAMES: Record<string, string> = {
+  oil: "Масло",
+  perfume: "Парфюм",
+  accessory: "Аксессуар",
+};
 
 type CartStockWarning = {
   productId: string;
@@ -23,8 +33,6 @@ function getCartStockWarnings(items: CartItem[]): CartStockWarning[] {
     const availableCount = Number(item.count ?? 0);
     const quantity = Number(item.quantity);
 
-    const unitLabel = UNIT_LABELS[item.unit ?? "pcs"];
-
     if (availableCount <= 0) {
       return [{ productId: item.product_id, message: `Товар закончился: ${item.name}` }];
     }
@@ -33,7 +41,7 @@ function getCartStockWarnings(items: CartItem[]): CartStockWarning[] {
       return [
         {
           productId: item.product_id,
-          message: `Недостаточно товара: ${item.name}. В корзине: ${quantity} ${unitLabel}, доступно: ${availableCount} ${unitLabel}.`,
+          message: `Превышен лимит запаса: ${item.name}. Уменьшите количество в корзине.`,
         },
       ];
     }
@@ -74,10 +82,13 @@ export default function CartPage() {
       setRefreshing(true);
 
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, brand, price_usd, volume_ml, image_url, count, unit, category")
-        .in("id", productIds);
+      const [{ data, error }, stockMap] = await Promise.all([
+        supabase
+          .from("products")
+          .select("id, name, brand, price_usd, volume_ml, image_url, count, unit, category, attributes, gender, country_of_origin")
+          .in("id", productIds),
+        fetchAinurStockMap().catch(() => null),
+      ]);
 
       setRefreshing(false);
 
@@ -86,19 +97,40 @@ export default function CartPage() {
         return;
       }
 
-      const priceById = new Map(currentItems.map((item) => [item.product_id, Number(item.price_usd)]));
-      const changedPriceIds = (data as CartProductSnapshot[])
-        .filter((product) => priceById.has(product.id) && priceById.get(product.id) !== Number(product.price_usd))
+      const fresh = data as Product[];
+      const overlaid = stockMap ? applyStockOverlay(fresh, stockMap) : fresh;
+
+      const priceById = new Map(
+        currentItems.map((item) => [item.product_id, Number(item.price_usd)]),
+      );
+      const changedPriceIds = overlaid
+        .filter(
+          (product) =>
+            priceById.has(product.id) && priceById.get(product.id) !== Number(product.price_usd),
+        )
         .map((product) => product.id);
 
-      syncItemsWithProducts(data as CartProductSnapshot[]);
+      const snapshots: CartProductSnapshot[] = overlaid.map((p) => ({
+        id: p.id,
+        name: p.name,
+        brand: p.brand,
+        price_usd: Number(p.price_usd),
+        volume_ml: p.volume_ml,
+        image_url: p.image_url,
+        count: Number(p.count ?? 0),
+        unit: p.unit,
+        category: p.category,
+        attributes: p.attributes ?? null,
+        gender: p.gender ?? null,
+        country_of_origin: p.country_of_origin ?? null,
+      }));
+
+      syncItemsWithProducts(snapshots);
       setPriceUpdatedIds(new Set(changedPriceIds));
 
-      if (showToast) {
-        toast.success("Остатки обновлены");
-      }
+      if (showToast) toast.success("Остатки обновлены");
     },
-    [syncItemsWithProducts]
+    [syncItemsWithProducts],
   );
 
   useEffect(() => {
@@ -107,10 +139,10 @@ export default function CartPage() {
 
   useEffect(() => {
     if (!mounted || !productIdsKey) return;
-
     void refreshCartProducts();
   }, [mounted, productIdsKey, refreshCartProducts]);
 
+  // Realtime: react to admin price/stock updates in Supabase as before.
   useEffect(() => {
     if (!mounted || !productIdsKey) return;
 
@@ -125,13 +157,11 @@ export default function CartPage() {
           const currentItems = useCartStore.getState().items;
           const currentItem = currentItems.find((item) => item.product_id === product.id);
           if (!currentItem) return;
-
           if (Number(currentItem.price_usd) !== Number(product.price_usd)) {
             setPriceUpdatedIds((current) => new Set(current).add(product.id));
           }
-
           useCartStore.getState().syncItemsWithProducts([product]);
-        }
+        },
       )
       .subscribe();
 
@@ -190,9 +220,15 @@ export default function CartPage() {
           {items.map((item) => {
             const availableCount = Number(item.count ?? 0);
             const isAvailable = availableCount > 0;
-            const canIncrement = isAvailable && item.quantity < availableCount;
             const stockWarning = stockWarningsById.get(item.product_id);
             const priceWasUpdated = priceUpdatedIds.has(item.product_id);
+            const countryCode = item.country_of_origin
+              ? COUNTRY_CODES[item.country_of_origin] ?? null
+              : null;
+            const gender = item.gender ?? (item.attributes?.gender as string | undefined);
+            const quality = item.attributes?.quality as string | undefined;
+            const accessoryType = item.attributes?.type as string | undefined;
+            const categoryName = CATEGORY_NAMES[item.category];
 
             return (
               <article key={item.product_id} className="card cart-item">
@@ -212,18 +248,33 @@ export default function CartPage() {
                   )}
                 </div>
 
-                <div>
+                <div className="cart-item-info">
                   {item.category !== "accessory" && <p className="product-brand">{item.brand}</p>}
                   <h3 className="product-title">{item.name}</h3>
-                  {item.category !== "accessory" && (
-                    <p className="product-category-label">
-                      {item.category === "oil" ? "Масло" : "Парфюм"}
-                    </p>
-                  )}
+                  <div className="cart-item-badges">
+                    {categoryName && (
+                      <span className="badge badge-muted">{categoryName}</span>
+                    )}
+                    {quality === "De Luxe" && (
+                      <span className="badge badge-deluxe">De Luxe</span>
+                    )}
+                    {quality === "Premium" && (
+                      <span className="badge badge-premium">Premium</span>
+                    )}
+                    {accessoryType && (
+                      <span className="badge badge-muted">{accessoryType}</span>
+                    )}
+                    {gender && GENDER_LABELS[gender] && (
+                      <span className="badge badge-muted">{GENDER_LABELS[gender]}</span>
+                    )}
+                    {countryCode && (
+                      <span className="badge-country-round" title={item.country_of_origin ?? ""}>
+                        {countryCode}
+                      </span>
+                    )}
+                  </div>
                   <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
-                    {isAvailable
-                      ? `В наличии: ${availableCount} ${UNIT_LABELS[item.unit ?? "pcs"]}`
-                      : "Нет в наличии"}
+                    {isAvailable ? "В наличии" : "Нет в наличии"}
                   </p>
                   {stockWarning && (
                     <p className="product-availability is-empty">{stockWarning}</p>
@@ -231,49 +282,22 @@ export default function CartPage() {
                   {priceWasUpdated && (
                     <p className="product-availability">Цена была обновлена</p>
                   )}
-                  {isAvailable && item.quantity > availableCount && (
-                    <button
-                      type="button"
-                      onClick={() => updateQuantity(item.product_id, availableCount)}
-                      className="btn btn-secondary mt-3 min-h-9 px-3 text-xs"
-                    >
-                      Уменьшить до доступного количества
-                    </button>
-                  )}
                 </div>
 
-                {item.unit === "ml" ? (
-                  <div className="cart-ml-input">
-                    <MlInput
-                      value={item.quantity}
-                      min={1}
-                      max={availableCount || undefined}
-                      onChange={(v) => updateQuantity(item.product_id, v)}
-                      className="input volume-input"
-                      aria-label="Объём, мл"
-                    />
-                    <span className="volume-unit">мл</span>
-                  </div>
-                ) : (
-                  <div className="quantity-control">
-                    <button
-                      onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
-                      className="icon-button"
-                      aria-label="Уменьшить"
-                    >
-                      <Minus size={14} />
-                    </button>
-                    <span className="quantity-value">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
-                      disabled={!canIncrement}
-                      className="icon-button"
-                      aria-label="Увеличить"
-                    >
-                      <Plus size={14} />
-                    </button>
-                  </div>
-                )}
+                <div className="cart-item-qty">
+                  <QuantityControls
+                    value={item.quantity}
+                    min={1}
+                    max={availableCount || 1}
+                    unit={item.unit ?? "pcs"}
+                    onChange={(v) => updateQuantity(item.product_id, v)}
+                    onDecrementBelowMin={() => removeItem(item.product_id)}
+                    onLimitExceeded={() =>
+                      toast.error(`Превышен лимит запаса: ${item.name}`, { id: "stock-limit" })
+                    }
+                    size="md"
+                  />
+                </div>
 
                 <div className="cart-line-total">
                   <p className="price">{formatKzt(itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity)}</p>

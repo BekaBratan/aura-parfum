@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Check, ShoppingBag } from "lucide-react";
-import { formatPriceUsd, formatPricePerUnit, getProductPrice, UNIT_LABELS, itemPriceKzt } from "@/lib/utils";
+import { Check, ShoppingBag, Trash2 } from "lucide-react";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
@@ -11,9 +11,15 @@ import { Product } from "@/types";
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
 import { COUNTRY_CODES } from "@/lib/countries";
-import { useRouter } from "next/navigation";
+import QuantityControls from "@/components/ui/QuantityControls";
 
 type ProductCardVariant = "grid" | "list";
+
+const LIMIT_TOAST_ID = "stock-limit";
+
+function notifyLimit(productName: string) {
+  toast.error(`Превышен лимит запаса: ${productName}`, { id: LIMIT_TOAST_ID });
+}
 
 export default function ProductCard({
   product,
@@ -24,14 +30,19 @@ export default function ProductCard({
 }) {
   const addItem = useCartStore((s) => s.addItem);
   const cartItems = useCartStore((s) => s.items);
+  const updateQuantity = useCartStore((s) => s.updateQuantity);
+  const removeItem = useCartStore((s) => s.removeItem);
   const kztRate = useCurrencyStore((s) => s.kztRate);
-  const router = useRouter();
   const [imageError, setImageError] = useState(false);
-  const isInCart = cartItems.some((i) => i.product_id === product.id);
+
+  const cartItem = cartItems.find((i) => i.product_id === product.id);
+  const isInCart = !!cartItem;
   const productCount = Number(product.count ?? 0);
   const isAvailable = productCount > 0;
   const isList = variant === "list";
   const isMl = product.unit === "ml";
+  const minVolume = product.min_volume ?? 1;
+  const priceUsd = getProductPrice(product);
 
   const cardClassName = [
     "product-card",
@@ -46,33 +57,33 @@ export default function ProductCard({
     setImageError(false);
   }, [product.image_url]);
 
-  const handleAddAccessory = (e: React.MouseEvent) => {
+  const stop = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isAvailable || isMl) return;
-    if (isInCart) {
-      router.push("/cart");
-      return;
-    }
+  };
+
+  const handleAdd = (e: React.MouseEvent) => {
+    stop(e);
+    if (!isAvailable) return;
+    const qty = isMl ? Math.min(minVolume, productCount) : 1;
     addItem({
       product_id: product.id,
       name: product.name,
       brand: product.brand,
       price_usd: priceUsd,
-      volume_ml: product.volume_ml,
+      volume_ml: isMl ? qty : product.volume_ml,
       image_url: product.image_url,
       count: productCount,
       unit: product.unit ?? "pcs",
       category: product.category ?? "accessory",
+      quantity: qty,
+      attributes: product.attributes ?? null,
+      gender: product.gender ?? null,
+      country_of_origin: product.country_of_origin ?? null,
     });
     toast.success(`${product.name} добавлен в корзину`);
   };
 
-  const availabilityText = isAvailable
-    ? `В наличии: ${productCount} ${UNIT_LABELS[product.unit ?? "pcs"]}`
-    : "Нет в наличии";
-
-  const priceUsd = getProductPrice(product);
   const priceDisplay = isMl
     ? formatPricePerUnit(priceUsd, "ml", kztRate)
     : product.category === "accessory"
@@ -87,6 +98,59 @@ export default function ProductCard({
     product.category === "oil" ? "Масло"
     : product.category === "perfume" ? "Парфюм"
     : null;
+
+  const availabilityText = isAvailable ? "В наличии" : "Нет в наличии";
+
+  const renderCartControls = () => {
+    if (!isAvailable) {
+      return (
+        <button
+          type="button"
+          disabled
+          className="btn btn-secondary product-card-action-button"
+        >
+          Нет в наличии
+        </button>
+      );
+    }
+
+    if (!isInCart) {
+      return (
+        <button
+          type="button"
+          onClick={handleAdd}
+          className="btn btn-primary product-card-action-button"
+        >
+          <ShoppingBag size={16} />
+          В корзину
+        </button>
+      );
+    }
+
+    return (
+      <div className="card-cart-controls-wrap" onClick={stop}>
+        <QuantityControls
+          value={cartItem.quantity}
+          min={1}
+          max={productCount}
+          unit={product.unit ?? "pcs"}
+          onChange={(v) => updateQuantity(product.id, v)}
+          onDecrementBelowMin={() => removeItem(product.id)}
+          onLimitExceeded={() => notifyLimit(product.name)}
+          size="sm"
+          className="card-cart-controls"
+        />
+        <button
+          type="button"
+          onClick={(e) => { stop(e); removeItem(product.id); }}
+          className="icon-button card-cart-remove"
+          aria-label="Удалить из корзины"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    );
+  };
 
   return (
     <Link
@@ -142,14 +206,10 @@ export default function ProductCard({
             </div>
           )}
 
-          {isAvailable && !isList && !isMl && (
-            <button
-              onClick={handleAddAccessory}
-              className={`product-quick-add${isInCart ? " is-in-cart" : ""}`}
-              aria-label={isInCart ? "Перейти в корзину" : "В корзину"}
-            >
-              {isInCart ? <Check size={18} /> : <ShoppingBag size={18} />}
-            </button>
+          {isInCart && (
+            <div className="product-card-incart-pill" aria-label="В корзине">
+              <Check size={14} />
+            </div>
           )}
         </div>
 
@@ -190,44 +250,7 @@ export default function ProductCard({
               <div>
                 <p className="price">{priceDisplay}</p>
               </div>
-              {isMl && isInCart ? (
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push("/cart"); }}
-                  className="btn product-card-action-button product-card-in-cart-btn"
-                >
-                  <Check size={16} />
-                  В корзине
-                </button>
-              ) : isMl ? (
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/product/${product.id}`); }}
-                  disabled={!isAvailable}
-                  className={`btn btn-primary product-card-action-button ${!isAvailable ? "is-disabled" : ""}`}
-                >
-                  Выбрать объём
-                </button>
-              ) : isInCart ? (
-                <button
-                  type="button"
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push("/cart"); }}
-                  className="btn product-card-action-button product-card-in-cart-btn"
-                >
-                  <Check size={16} />
-                  В корзине
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleAddAccessory}
-                  disabled={!isAvailable}
-                  className="btn btn-primary product-card-action-button"
-                >
-                  <ShoppingBag size={16} />
-                  {isAvailable ? "В корзину" : "Нет в наличии"}
-                </button>
-              )}
+              {renderCartControls()}
             </div>
           </>
         ) : (
@@ -241,6 +264,9 @@ export default function ProductCard({
               {availabilityText}
             </p>
             <p className="price">{priceDisplay}</p>
+            <div className="product-card-cart-row">
+              {renderCartControls()}
+            </div>
           </div>
         )}
       </article>
