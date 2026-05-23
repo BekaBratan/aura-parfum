@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 export interface AdminAinurProduct {
   id: string;
   name: string;
+  code: string;
   price: number;
   stock: number;
   category_id: string | null;
@@ -38,6 +39,7 @@ export async function GET(req: Request) {
       .map((p) => ({
         id: p.id,
         name: (p.options?.name ?? "").trim(),
+        code: (p.code ?? p.plu_code ?? "").trim(),
         price: Number(p.price ?? 0),
         stock: Number(p.stock?.[storeId] ?? 0),
         category_id: p.category_id ?? null,

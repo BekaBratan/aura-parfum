@@ -85,7 +85,7 @@ export default function CartPage() {
       const [{ data, error }, stockMap] = await Promise.all([
         supabase
           .from("products")
-          .select("id, name, brand, price_usd, volume_ml, image_url, count, unit, category, attributes, gender, country_of_origin")
+          .select("id, name, brand, price_usd, volume_ml, image_url, count, unit, category, attributes, gender, country_of_origin, code")
           .in("id", productIds),
         fetchAinurStockMap().catch(() => null),
       ]);

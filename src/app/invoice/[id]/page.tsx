@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import * as pdfMake from "pdfmake/build/pdfmake";
 import pdfFonts from "pdfmake/build/vfs_fonts";
 import type { TableCell, TDocumentDefinitions } from "pdfmake/interfaces";
@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/utils";
+import { formatOrderItemDetails, getOrderItemDetails } from "@/lib/orderItemDetails";
 import { useCurrencyStore } from "@/store/currencyStore";
 
 pdfMake.addVirtualFileSystem(pdfFonts);
@@ -58,16 +59,16 @@ function getInvoicePdfPath(order: Order) {
   return `invoices/${order.invoice_number}.pdf`;
 }
 
-function getCategoryLabel(item: Order["items"][number]): string {
-  if (item.category === "oil")       return "Масло";
-  if (item.category === "perfume")   return "Парфюм";
-  if (item.category === "accessory") return "Аксессуар";
-  return "";
-}
-
-function getProductLine(item: Order["items"][number]) {
-  const cat = getCategoryLabel(item);
-  return cat ? `[${cat}] ${item.name}` : item.name;
+// Build a 2-line cell for the PDF: product name on top, descriptor chips below.
+function buildProductCell(item: Order["items"][number]) {
+  const brand = item.category !== "accessory" && item.brand ? `${item.brand} ` : "";
+  const details = formatOrderItemDetails(item);
+  return {
+    stack: [
+      { text: `${brand}${item.name}`, bold: true },
+      ...(details ? [{ text: details, style: "muted", fontSize: 8.5, margin: [0, 2, 0, 0] }] : []),
+    ],
+  };
 }
 
 function getQtyLabel(item: Order["items"][number]) {
@@ -87,7 +88,7 @@ function buildInvoicePdfDefinition(order: Order, kztRate: number): TDocumentDefi
   const productRows: TableCell[][] = order.items.map((item) => {
     const priceKzt = itemKzt(item, kztRate);
     return [
-      { text: getProductLine(item) },
+      buildProductCell(item) as TableCell,
       { text: getQtyLabel(item), alignment: "center" },
       { text: formatKzt(priceKzt), alignment: "right" },
       { text: formatKzt(priceKzt * item.quantity), alignment: "right" },
@@ -185,11 +186,13 @@ function downloadBlob(blob: Blob, fileName: string) {
 }
 
 function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string, kztRate: number) {
-  const productLines = order.items.map((item, index) => {
-    const product = getProductLine(item);
+  const productLines = order.items.flatMap((item, index) => {
+    const brand = item.category !== "accessory" && item.brand ? `${item.brand} ` : "";
     const qty = getQtyLabel(item);
     const priceKzt = itemKzt(item, kztRate);
-    return `${index + 1}. ${product} - ${qty} × ${formatKzt(priceKzt)} = ${formatKzt(priceKzt * item.quantity)}`;
+    const details = formatOrderItemDetails(item);
+    const head = `${index + 1}. ${brand}${item.name} — ${qty} × ${formatKzt(priceKzt)} = ${formatKzt(priceKzt * item.quantity)}`;
+    return details ? [head, `   ${details}`] : [head];
   });
 
   return [
@@ -213,6 +216,7 @@ function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string, kztRate: n
 
 export default function InvoicePage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState("");
@@ -331,6 +335,7 @@ export default function InvoicePage() {
 
       setOrder((prev) => prev ? { ...prev, order_status: "cancelled" } : prev);
       toast.success("Заказ отменён. Запас товаров восстановлен.");
+      router.push("/catalog");
     } catch {
       toast.error("Не удалось отменить заказ");
     } finally {
@@ -402,13 +407,31 @@ export default function InvoicePage() {
             <div className="invoice-items">
               {order.items.map((item, index) => {
                 const priceKzt = itemKzt(item, kztRate);
+                const details = getOrderItemDetails(item);
                 return (
                   <div key={`${item.product_id}-${index}`} className="invoice-item">
                     <div>
+                      {item.category !== "accessory" && item.brand && (
+                        <p className="product-brand">{item.brand}</p>
+                      )}
                       <p className="product-title">{item.name}</p>
-                      <p className="product-meta">
-                        {getCategoryLabel(item)} · {getQtyLabel(item)} × {formatKzt(priceKzt)}
-                      </p>
+                      <div className="cart-item-badges">
+                        {details.map((d) => (
+                          <span
+                            key={d.key}
+                            className={
+                              d.tone === "deluxe"
+                                ? "badge badge-deluxe"
+                                : d.tone === "premium"
+                                ? "badge badge-premium"
+                                : "badge badge-muted"
+                            }
+                          >
+                            {d.label}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="product-meta">{getQtyLabel(item)} × {formatKzt(priceKzt)}</p>
                     </div>
                     <strong>{formatKzt(priceKzt * item.quantity)}</strong>
                   </div>

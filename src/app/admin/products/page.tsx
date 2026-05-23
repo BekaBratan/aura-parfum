@@ -30,6 +30,7 @@ interface FormState {
   is_featured: boolean;
   attributes: Record<string, string>;
   country_of_origin: string;
+  code: string;
   ainur_id: string | null;
   ainur_name: string | null;
 }
@@ -47,6 +48,7 @@ const emptyProduct: FormState = {
   is_featured: false,
   attributes: {},
   country_of_origin: "",
+  code: "",
   ainur_id: null,
   ainur_name: null,
 };
@@ -266,7 +268,14 @@ export default function AdminProducts() {
       if (filterAinurLink === "stale" && !(p.ainur_id && !(p.ainur_id in ainurStockById))) return false;
       if (search) {
         const q = search.toLowerCase();
-        if (!p.name.toLowerCase().includes(q) && !p.brand.toLowerCase().includes(q)) return false;
+        const code = (p.code ?? "").toLowerCase();
+        if (
+          !p.name.toLowerCase().includes(q) &&
+          !p.brand.toLowerCase().includes(q) &&
+          !code.includes(q)
+        ) {
+          return false;
+        }
       }
       return true;
     });
@@ -348,6 +357,7 @@ export default function AdminProducts() {
       count: String(product.count ?? 0),
       is_featured: product.is_featured,
       country_of_origin: product.country_of_origin ?? "",
+      code: product.code ?? "",
       ainur_id: product.ainur_id ?? null,
       ainur_name: null, // resolved by the picker / displayed only after re-pick
       attributes: Object.fromEntries(
@@ -376,8 +386,9 @@ export default function AdminProducts() {
       ...prev,
       ainur_id: a.id,
       ainur_name: a.name,
-      // Prefill name/price/count for new products if the operator hasn't typed anything yet
+      // Prefill name/code/price/count for new products if the operator hasn't typed anything yet
       name: prev.name || a.name,
+      code: prev.code || a.code,
       price: prev.price || (prev.category === "accessory" ? String(Math.round(a.price)) : prev.price),
       count: prev.count || String(a.stock),
     }));
@@ -472,6 +483,7 @@ export default function AdminProducts() {
           : null,
         price_usd: price,
         ainur_id: form.ainur_id || null,
+        code: form.code.trim() || null,
       };
 
       let saveError = await save(payload);
@@ -481,6 +493,12 @@ export default function AdminProducts() {
         const { ainur_id, ...rest } = payload;
         payload = rest;
         toast.error("Колонка ainur_id ещё не создана. Запустите supabase/migrations/ainur_id.sql");
+        saveError = await save(payload);
+      }
+      if (saveError?.includes("\"code\"") || saveError?.match(/column .*code.* does not exist/i)) {
+        const { code, ...rest } = payload;
+        payload = rest;
+        toast.error("Колонка code ещё не создана. Запустите supabase/migrations/product_code.sql");
         saveError = await save(payload);
       }
       if (saveError?.includes("price_usd")) {
@@ -635,7 +653,7 @@ export default function AdminProducts() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по названию или бренду..."
+              placeholder="Поиск по названию, бренду или коду..."
               className="input-dark w-full pl-9"
             />
             {search && (
@@ -843,8 +861,9 @@ export default function AdminProducts() {
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-[var(--text-secondary)]">
                 <th className="pb-3 pr-4">Фото</th>
+                <th className="pb-3 pr-4 hidden sm:table-cell">Код</th>
                 <th className="pb-3 pr-4">Название</th>
-                <th className="pb-3 pr-4 hidden sm:table-cell">Бренд</th>
+                <th className="pb-3 pr-4 hidden md:table-cell">Бренд</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Категория</th>
                 <th className="pb-3 pr-4 hidden lg:table-cell">Тип</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Цена</th>
@@ -875,8 +894,17 @@ export default function AdminProducts() {
                 return (
                   <tr key={product.id} className="border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors">
                     <td className="py-3 pr-4"><ProductThumbnail product={product} /></td>
+                    <td className="py-3 pr-4 hidden sm:table-cell">
+                      {product.code ? (
+                        <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-[var(--gold)]/15 text-[var(--gold)]">
+                          {product.code}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[var(--text-secondary)]">—</span>
+                      )}
+                    </td>
                     <td className="py-3 pr-4 text-[var(--text-primary)]">{product.name}</td>
-                    <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{cat !== "accessory" ? product.brand : "—"}</td>
+                    <td className="py-3 pr-4 text-[var(--text-secondary)] hidden md:table-cell">{cat !== "accessory" ? product.brand : "—"}</td>
                     <td className="py-3 pr-4 hidden md:table-cell">
                       <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)]">
                         {CATEGORY_LABELS[cat]}
@@ -986,6 +1014,21 @@ export default function AdminProducts() {
               <div className="form-group">
                 <label htmlFor="product-name" className="form-label">Название товара</label>
                 <input id="product-name" name="name" value={form.name} onChange={handleChange} placeholder="Например: Coco Mademoiselle" className="input-dark" />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="product-code" className="form-label">Код товара</label>
+                <input
+                  id="product-code"
+                  name="code"
+                  value={form.code}
+                  onChange={handleChange}
+                  placeholder="Например: 00655"
+                  className="input-dark font-mono"
+                />
+                <p className="form-help">
+                  Можно ввести вручную или подтянуть из Ainur при привязке. Используется для поиска в админке.
+                </p>
               </div>
 
               {form.category !== "accessory" && (

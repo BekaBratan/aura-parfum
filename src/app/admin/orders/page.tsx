@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
 import { formatPrice, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/utils";
+import { getOrderItemDetails } from "@/lib/orderItemDetails";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { OrderItem } from "@/types";
 
@@ -264,15 +265,36 @@ export default function AdminOrders() {
               <div className="border-t border-[var(--border)] pt-3 mt-3">
                 <h4 className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Товары</h4>
                 {detail.items.map((item, i) => {
-                  const catLabel = item.category === "oil" ? "Масло" : item.category === "perfume" ? "Парфюм" : "Аксессуар";
                   const unitLabel = item.unit === "ml" ? `${item.quantity} мл` : `${item.quantity} шт.`;
+                  const details = getOrderItemDetails(item, { includeCode: true });
                   return (
-                    <div key={i} className="flex justify-between gap-4 py-1">
-                      <span className="text-[var(--text-secondary)]">
-                        <span className="text-[var(--gold)] text-xs font-semibold mr-1">[{catLabel}]</span>
-                        {item.name} · {unitLabel}
-                      </span>
-                      <span className="text-[var(--text-primary)] whitespace-nowrap">{formatPrice(itemKzt(item, kztRate) * item.quantity)}</span>
+                    <div key={i} className="flex justify-between gap-4 py-2 border-b border-[var(--border)]/30 last:border-0">
+                      <div className="min-w-0">
+                        {item.category !== "accessory" && item.brand && (
+                          <p className="text-[10px] uppercase tracking-wider text-[var(--gold)] font-bold mb-0.5">{item.brand}</p>
+                        )}
+                        <p className="text-[var(--text-primary)] text-sm">{item.name}</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {details.map((d) => (
+                            <span
+                              key={d.key}
+                              className={`text-[10px] px-1.5 py-0.5 rounded ${
+                                d.tone === "deluxe"
+                                  ? "bg-[var(--gold)]/15 text-[var(--gold)]"
+                                  : d.tone === "premium"
+                                  ? "bg-purple-500/10 text-purple-300"
+                                  : d.tone === "code"
+                                  ? "bg-[var(--gold)]/15 text-[var(--gold)] font-mono"
+                                  : "bg-white/5 text-[var(--text-secondary)]"
+                              }`}
+                            >
+                              {d.tone === "code" ? `Код: ${d.label}` : d.label}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-[var(--text-secondary)] mt-1">{unitLabel}</p>
+                      </div>
+                      <span className="text-[var(--text-primary)] whitespace-nowrap font-semibold">{formatPrice(itemKzt(item, kztRate) * item.quantity)}</span>
                     </div>
                   );
                 })}

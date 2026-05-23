@@ -45,7 +45,12 @@ export default function AinurPicker({
     if (!list) return [];
     const q = search.trim().toLowerCase();
     if (!q) return list;
-    return list.filter((p) => p.name.toLowerCase().includes(q) || p.id.includes(q));
+    return list.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.id.includes(q) ||
+        p.code.toLowerCase().includes(q),
+    );
   }, [list, search]);
 
   return (
@@ -76,7 +81,7 @@ export default function AinurPicker({
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по имени или id..."
+              placeholder="Поиск по имени, коду или id..."
               className="input-dark w-full pl-9"
             />
           </div>
@@ -110,7 +115,14 @@ export default function AinurPicker({
                       }`}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-[var(--text-primary)] truncate">{p.name || "(без имени)"}</p>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {p.code && (
+                            <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-[var(--gold)]/15 text-[var(--gold)] shrink-0">
+                              {p.code}
+                            </span>
+                          )}
+                          <p className="text-sm text-[var(--text-primary)] truncate">{p.name || "(без имени)"}</p>
+                        </div>
                         <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">
                           id: {p.id}
                           {isCurrent && <span className="ml-2 text-[var(--gold)]">— текущая привязка</span>}

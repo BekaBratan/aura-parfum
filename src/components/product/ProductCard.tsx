@@ -80,6 +80,7 @@ export default function ProductCard({
       attributes: product.attributes ?? null,
       gender: product.gender ?? null,
       country_of_origin: product.country_of_origin ?? null,
+      code: product.code ?? null,
     });
     toast.success(`${product.name} добавлен в корзину`);
   };

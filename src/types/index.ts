@@ -19,6 +19,7 @@ export interface Product {
   min_volume: number | null;
   country_of_origin: string | null;
   ainur_id?: string | null;
+  code?: string | null;
 }
 
 export interface OrderItem {
@@ -34,6 +35,7 @@ export interface OrderItem {
   attributes?: Record<string, string | string[]> | null;
   gender?: string | null;
   country_of_origin?: string | null;
+  code?: string | null;
 }
 
 export interface Order {

@@ -87,7 +87,7 @@ function CatalogContent() {
   const [showAllCountries, setShowAllCountries] = useState(false);
   const [showAllAttrs, setShowAllAttrs] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 24;
+  const PAGE_SIZE = 30;
 
   const FILTER_SHOW_LIMIT = 8;
   const [showFilters, setShowFilters] = useState(false);
@@ -227,6 +227,7 @@ function CatalogContent() {
         gender: [val],
       },
     }));
+    setPage(1);
   }, []);
 
   // Country filter options for oil and perfume

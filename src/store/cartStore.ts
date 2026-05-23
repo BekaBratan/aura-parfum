@@ -15,6 +15,7 @@ export type CartProductSnapshot = {
   attributes?: Record<string, string | string[]> | null;
   gender?: string | null;
   country_of_origin?: string | null;
+  code?: string | null;
 };
 
 interface CartStore {
@@ -94,6 +95,7 @@ export const useCartStore = create<CartStore>()(
               attributes: product.attributes ?? item.attributes ?? null,
               gender: product.gender ?? item.gender ?? null,
               country_of_origin: product.country_of_origin ?? item.country_of_origin ?? null,
+              code: product.code ?? item.code ?? null,
             };
           }),
         });

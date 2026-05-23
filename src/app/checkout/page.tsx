@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { ArrowLeft, Loader2, Send, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPriceUsd, UNIT_LABELS, itemPriceKzt } from "@/lib/utils";
+import { getOrderItemDetails } from "@/lib/orderItemDetails";
 import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
@@ -309,14 +310,33 @@ export default function CheckoutPage() {
             <div className="order-items">
               {items.map((item) => {
                 const unitLabel = UNIT_LABELS[item.unit ?? "pcs"];
-                const catLabel = item.category === "oil" ? "Масло" : item.category === "perfume" ? "Парфюм" : "Аксессуар";
+                const details = getOrderItemDetails(item);
                 return (
                   <div key={item.product_id} className="order-item">
-                    <span>
-                      {catLabel}: {item.name} — {item.quantity} {unitLabel}
-                    </span>
+                    <div className="order-item-main">
+                      {item.category !== "accessory" && item.brand && (
+                        <p className="product-brand">{item.brand}</p>
+                      )}
+                      <p className="product-title">{item.name}</p>
+                      <div className="cart-item-badges">
+                        {details.map((d) => (
+                          <span
+                            key={d.key}
+                            className={
+                              d.tone === "deluxe"
+                                ? "badge badge-deluxe"
+                                : d.tone === "premium"
+                                ? "badge badge-premium"
+                                : "badge badge-muted"
+                            }
+                          >
+                            {d.label}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="product-meta">{item.quantity} {unitLabel}</p>
+                    </div>
                     <strong>{formatKzt(itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity)}</strong>
-
                   </div>
                 );
               })}

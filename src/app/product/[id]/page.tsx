@@ -95,6 +95,7 @@ export default function ProductPage() {
       attributes: product.attributes ?? null,
       gender: product.gender ?? null,
       country_of_origin: product.country_of_origin ?? null,
+      code: product.code ?? null,
     });
     const totalKzt = formatPriceUsd(priceUsd * qty, kztRate);
     const label = isMl ? `${qty} мл → ${totalKzt}` : product.name;
