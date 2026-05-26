@@ -9,7 +9,8 @@ import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay"
 import { itemPriceKzt } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
-import Image from "next/image";
+import { useActiveDiscounts } from "@/lib/useDiscounts";
+import { calculateDiscounts } from "@/lib/discounts";
 import Link from "next/link";
 import { Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import QuantityControls from "@/components/ui/QuantityControls";
@@ -73,6 +74,20 @@ export default function CartPage() {
   );
   const hasInvalidStock = stockWarnings.length > 0;
 
+  const activeDiscounts = useActiveDiscounts();
+  const discountResult = useMemo(
+    () => calculateDiscounts(items, activeDiscounts, kztRate),
+    [items, activeDiscounts, kztRate],
+  );
+  const lineByProductId = useMemo(
+    () => new Map(discountResult.lines.map((l) => [l.product_id, l])),
+    [discountResult.lines],
+  );
+  const ruleNameById = useMemo(
+    () => new Map(discountResult.applied.map((a) => [a.discount_id, a.name])),
+    [discountResult.applied],
+  );
+
   const refreshCartProducts = useCallback(
     async ({ showToast = false } = {}) => {
       const currentItems = useCartStore.getState().items;
@@ -85,7 +100,7 @@ export default function CartPage() {
       const [{ data, error }, stockMap] = await Promise.all([
         supabase
           .from("products")
-          .select("id, name, brand, price_usd, volume_ml, image_url, count, unit, category, attributes, gender, country_of_origin, code")
+          .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category, attributes, gender, country_of_origin, code")
           .in("id", productIds),
         fetchAinurStockMap().catch(() => null),
       ]);
@@ -93,7 +108,8 @@ export default function CartPage() {
       setRefreshing(false);
 
       if (error || !data) {
-        toast.error("Не удалось обновить остатки товаров");
+        console.error("Cart stock refresh failed:", error);
+        if (showToast) toast.error("Не удалось обновить остатки товаров");
         return;
       }
 
@@ -117,6 +133,7 @@ export default function CartPage() {
         price_usd: Number(p.price_usd),
         volume_ml: p.volume_ml,
         image_url: p.image_url,
+        image_thumb_url: p.image_thumb_url ?? null,
         count: Number(p.count ?? 0),
         unit: p.unit,
         category: p.category,
@@ -210,7 +227,14 @@ export default function CartPage() {
             <p className="eyebrow">Покупки</p>
             <h1 className="section-title">Корзина</h1>
           </div>
-          <button onClick={clearCart} className="btn btn-ghost">
+          <button
+            onClick={() => {
+              if (window.confirm("Очистить корзину? Это действие нельзя отменить")) {
+                clearCart();
+              }
+            }}
+            className="btn btn-ghost"
+          >
             <Trash2 size={15} />
             Очистить
           </button>
@@ -234,12 +258,13 @@ export default function CartPage() {
               <article key={item.product_id} className="card cart-item">
                 <div className="cart-image">
                   {item.image_url ? (
-                    <Image
-                      src={item.image_url}
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.image_thumb_url ?? item.image_url ?? ""}
                       alt={item.name}
-                      fill
+                      loading="lazy"
+                      decoding="async"
                       className="product-card-img"
-                      sizes="96px"
                     />
                   ) : (
                     <div className="image-placeholder">
@@ -300,7 +325,25 @@ export default function CartPage() {
                 </div>
 
                 <div className="cart-line-total">
-                  <p className="price">{formatKzt(itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity)}</p>
+                  {(() => {
+                    const line = lineByProductId.get(item.product_id);
+                    const baseKzt = itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity;
+                    if (line && line.discountKzt > 0) {
+                      const ruleName = line.appliedDiscountId
+                        ? ruleNameById.get(line.appliedDiscountId)
+                        : null;
+                      return (
+                        <>
+                          <p className="price price-old">{formatKzt(baseKzt)}</p>
+                          <p className="price">{formatKzt(line.finalKzt)}</p>
+                          <p className="line-discount-note">
+                            {ruleName ? `«${ruleName}» ` : ""}−{formatKzt(line.discountKzt)}
+                          </p>
+                        </>
+                      );
+                    }
+                    return <p className="price">{formatKzt(baseKzt)}</p>;
+                  })()}
                   <button onClick={() => removeItem(item.product_id)} className="btn btn-ghost">
                     Удалить
                   </button>
@@ -311,10 +354,29 @@ export default function CartPage() {
         </div>
 
         <div className="card summary-card">
-          <div className="summary-row">
-            <span>Итого</span>
-            <span className="summary-total">{formatKzt(totalKzt(kztRate))}</span>
-          </div>
+          {discountResult.discountKzt > 0 ? (
+            <>
+              <div className="summary-row text-[var(--color-muted)]">
+                <span>Сумма</span>
+                <span>{formatKzt(discountResult.subtotalKzt)}</span>
+              </div>
+              {discountResult.applied.map((a) => (
+                <div key={a.discount_id} className="summary-row" style={{ color: "var(--color-success)" }}>
+                  <span>{a.name}</span>
+                  <span>−{formatKzt(a.amount_kzt)}</span>
+                </div>
+              ))}
+              <div className="summary-row">
+                <span>Итого</span>
+                <span className="summary-total">{formatKzt(discountResult.totalKzt)}</span>
+              </div>
+            </>
+          ) : (
+            <div className="summary-row">
+              <span>Итого</span>
+              <span className="summary-total">{formatKzt(totalKzt(kztRate))}</span>
+            </div>
+          )}
 
           {hasInvalidStock ? (
             <>
@@ -340,7 +402,7 @@ export default function CartPage() {
             disabled={refreshing}
             className="btn btn-secondary cart-checkout"
           >
-            {refreshing ? "Обновляем..." : "Обновить остатки"}
+            {refreshing ? "Проверяем..." : "Проверить наличие"}
           </button>
         </div>
       </div>

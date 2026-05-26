@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Check, ShoppingBag, Trash2 } from "lucide-react";
 import { formatPriceUsd, formatPricePerUnit, getProductPrice } from "@/lib/utils";
@@ -73,6 +72,7 @@ export default function ProductCard({
       price_usd: priceUsd,
       volume_ml: isMl ? qty : product.volume_ml,
       image_url: product.image_url,
+      image_thumb_url: product.image_thumb_url ?? null,
       count: productCount,
       unit: product.unit ?? "pcs",
       category: product.category ?? "accessory",
@@ -167,16 +167,13 @@ export default function ProductCard({
           }
         >
           {product.image_url && !imageError ? (
-            <Image
-              src={product.image_url}
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={product.image_thumb_url ?? product.image_url ?? ""}
               alt={product.name}
-              fill
+              loading="lazy"
+              decoding="async"
               className="product-card-img"
-              sizes={
-                isList
-                  ? "(max-width: 767px) 104px, 170px"
-                  : "(max-width: 640px) 50vw, (max-width: 1024px) 33vw, (max-width: 1536px) 25vw, 20vw"
-              }
               onError={() => setImageError(true)}
             />
           ) : (

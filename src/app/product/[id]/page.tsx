@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
 import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
 import { formatPriceUsd, formatPricePerUnit, getProductPrice, GENDER_LABELS } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
-import { formatUsd } from "@/lib/currency";
 import { COUNTRY_CODES } from "@/lib/countries";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
@@ -88,6 +86,7 @@ export default function ProductPage() {
       price_usd: priceUsd,
       volume_ml: isMl ? qty : product.volume_ml,
       image_url: product.image_url,
+      image_thumb_url: product.image_thumb_url ?? null,
       count: productCount,
       unit: product.unit ?? "pcs",
       category: product.category ?? "accessory",
@@ -172,13 +171,13 @@ export default function ProductPage() {
         <div className="product-detail-grid">
           <div className="product-detail-image">
             {product.image_url && !imageError ? (
-              <Image
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
                 src={product.image_url}
                 alt={product.name}
-                fill
+                decoding="async"
+                fetchPriority="high"
                 className="product-detail-img"
-                sizes="(max-width: 768px) 100vw, 50vw"
-                priority
                 onError={() => setImageError(true)}
               />
             ) : (
@@ -262,12 +261,6 @@ export default function ProductPage() {
                   ? formatKzt(priceUsd)
                   : formatPriceUsd(priceUsd, kztRate)}
               </p>
-              {!isMl && product.category !== "accessory" && (
-                <p className="detail-price-usd">{formatUsd(priceUsd)}</p>
-              )}
-              {isMl && (
-                <p className="detail-price-usd">{formatUsd(priceUsd)} / мл</p>
-              )}
             </div>
 
             {/* Volume / quantity selector */}

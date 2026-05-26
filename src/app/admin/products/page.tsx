@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
 import { ImageIcon, Link2, Link2Off, Loader2, Pencil, Plus, Save, Search, Trash2, Upload, X } from "lucide-react";
+import imageCompression from "browser-image-compression";
 import toast from "react-hot-toast";
 import { useAdminRole } from "@/lib/adminRole";
 import { createClient } from "@/lib/supabase/client";
@@ -26,6 +26,7 @@ interface FormState {
   volume_ml: string;
   min_volume: string;
   image_url: string;
+  image_thumb_url: string;
   count: string;
   is_featured: boolean;
   attributes: Record<string, string>;
@@ -44,6 +45,7 @@ const emptyProduct: FormState = {
   volume_ml: "",
   min_volume: "",
   image_url: "",
+  image_thumb_url: "",
   count: "",
   is_featured: false,
   attributes: {},
@@ -128,6 +130,31 @@ function createUploadPath(file: File, form: FormState, productId: string | null)
   return `products/${baseName}-${Date.now()}.${extension}`;
 }
 
+// Compress an admin-uploaded product image to a WebP variant. Two variants are
+// produced per upload (see uploadSelectedImage) — `full` for the product page,
+// `thumb` for catalog cards / cart. All compression runs in the browser via
+// browser-image-compression; no server- or CDN-side transformation is used
+// (Vercel image opt is disabled and Supabase transforms require Pro).
+async function compressProductImage(
+  file: File,
+  opts: { maxWidthOrHeight: number; initialQuality: number; maxSizeMB: number; nameSuffix: string },
+): Promise<File> {
+  try {
+    const compressed = await imageCompression(file, {
+      maxSizeMB: opts.maxSizeMB,
+      maxWidthOrHeight: opts.maxWidthOrHeight,
+      initialQuality: opts.initialQuality,
+      fileType: "image/webp",
+      useWebWorker: true,
+    });
+    const baseName = file.name.replace(/\.[^.]+$/, "");
+    return new File([compressed], `${baseName}${opts.nameSuffix}.webp`, { type: "image/webp" });
+  } catch (error) {
+    console.error(`Image compression failed (${opts.nameSuffix || "full"}), uploading original`, error);
+    return file;
+  }
+}
+
 // Allow any decimal input for price (e.g. "2.50")
 function normalizeDecimalInput(value: string): string {
   // Keep digits and at most one decimal point
@@ -148,7 +175,8 @@ function ProductThumbnail({ product }: { product: Product }) {
   return (
     <div className="w-10 h-10 rounded-lg overflow-hidden bg-[var(--dark-3)] relative">
       {product.image_url && !imageError ? (
-        <Image src={product.image_url} alt="" fill className="object-cover" sizes="40px" onError={() => setImageError(true)} />
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={product.image_thumb_url ?? product.image_url ?? ""} alt="" loading="lazy" decoding="async" className="product-thumb-img" onError={() => setImageError(true)} />
       ) : (
         <div className="absolute inset-0 grid place-items-center text-[var(--gold-dark)]">
           <ImageIcon size={16} />
@@ -354,6 +382,7 @@ export default function AdminProducts() {
       volume_ml: product.volume_ml === null ? "" : String(product.volume_ml),
       min_volume: product.min_volume === null ? "" : String(product.min_volume),
       image_url: product.image_url || "",
+      image_thumb_url: product.image_thumb_url ?? "",
       count: String(product.count ?? 0),
       is_featured: product.is_featured,
       country_of_origin: product.country_of_origin ?? "",
@@ -401,13 +430,39 @@ export default function AdminProducts() {
 
   const uploadSelectedImage = async () => {
     if (!selectedImageFile) return null;
-    const imagePath = createUploadPath(selectedImageFile, form, editId);
-    const { error } = await supabase.storage
-      .from(PRODUCT_IMAGE_BUCKET)
-      .upload(imagePath, selectedImageFile, { cacheControl: "3600", contentType: selectedImageFile.type || undefined, upsert: false });
-    if (error) throw error;
-    const { data } = supabase.storage.from(PRODUCT_IMAGE_BUCKET).getPublicUrl(imagePath);
-    return { path: imagePath, publicUrl: data.publicUrl };
+
+    // Generate full (800px / q=85) and thumb (400px / q=75) WebP variants
+    // in parallel so they share the same timestamp in the path.
+    const [fullFile, thumbFile] = await Promise.all([
+      compressProductImage(selectedImageFile, {
+        maxWidthOrHeight: 800, initialQuality: 0.85, maxSizeMB: 0.3, nameSuffix: "",
+      }),
+      compressProductImage(selectedImageFile, {
+        maxWidthOrHeight: 400, initialQuality: 0.75, maxSizeMB: 0.1, nameSuffix: "-thumb",
+      }),
+    ]);
+
+    const fullPath = createUploadPath(fullFile, form, editId);
+    const thumbPath = fullPath.replace(/(\.[^.]+)$/, "-thumb$1");
+
+    const bucket = supabase.storage.from(PRODUCT_IMAGE_BUCKET);
+    const opts = { cacheControl: "3600", upsert: false };
+
+    const fullRes = await bucket.upload(fullPath, fullFile, { ...opts, contentType: fullFile.type || undefined });
+    if (fullRes.error) throw fullRes.error;
+
+    const thumbRes = await bucket.upload(thumbPath, thumbFile, { ...opts, contentType: thumbFile.type || undefined });
+    if (thumbRes.error) {
+      await bucket.remove([fullPath]);
+      throw thumbRes.error;
+    }
+
+    return {
+      fullPath,
+      thumbPath,
+      publicUrl: bucket.getPublicUrl(fullPath).data.publicUrl,
+      thumbPublicUrl: bucket.getPublicUrl(thumbPath).data.publicUrl,
+    };
   };
 
   const handleSave = async () => {
@@ -431,12 +486,16 @@ export default function AdminProducts() {
     if (minVolume !== null && minVolume <= 0) { toast.error("Минимальный объём должен быть больше 0"); return; }
 
     setSaving(true);
-    let uploadedPath: string | null = null;
+    const uploadedPaths: string[] = [];
 
     try {
       const uploadedImage = await uploadSelectedImage();
-      uploadedPath = uploadedImage?.path || null;
+      if (uploadedImage) {
+        uploadedPaths.push(uploadedImage.fullPath, uploadedImage.thumbPath);
+      }
       const imageUrl = uploadedImage?.publicUrl || form.image_url || null;
+      const imageThumbUrl = uploadedImage?.thumbPublicUrl
+        || (uploadedImage ? null : form.image_thumb_url || null);
 
       const unit = form.category === "accessory" ? "pcs" : "ml";
 
@@ -472,6 +531,7 @@ export default function AdminProducts() {
         gender: genderVal,
         volume_ml: volumeMl,
         image_url: imageUrl,
+        image_thumb_url: imageThumbUrl,
         count,
         is_featured: form.is_featured,
         category: form.category,
@@ -511,6 +571,12 @@ export default function AdminProducts() {
         payload = rest;
         saveError = await save(payload);
       }
+      if (saveError?.includes("image_thumb_url")) {
+        const { image_thumb_url, ...rest } = payload;
+        payload = rest;
+        toast.error("Колонка image_thumb_url ещё не создана. Запустите supabase/migrations/product_image_thumb.sql");
+        saveError = await save(payload);
+      }
       if (saveError?.includes("category") || saveError?.includes("unit") ||
           saveError?.includes("attributes") || saveError?.includes("min_volume")) {
         const { category, unit: u, attributes: a, min_volume, ...rest } = payload;
@@ -519,7 +585,9 @@ export default function AdminProducts() {
       }
 
       if (saveError) {
-        if (uploadedPath) await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([uploadedPath]);
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove(uploadedPaths);
+        }
         toast.error(saveError);
         return;
       }

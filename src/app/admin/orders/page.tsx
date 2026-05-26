@@ -300,10 +300,33 @@ export default function AdminOrders() {
                 })}
               </div>
 
-              <div className="border-t border-[var(--border)] pt-3 flex justify-between">
-                <span className="font-semibold text-[var(--text-primary)]">Итого</span>
-                <span className="font-bold text-lg text-gold-gradient">{formatPrice(orderTotalKzt(detail.items, kztRate))}</span>
-              </div>
+              {(() => {
+                const subtotal = orderTotalKzt(detail.items, kztRate);
+                const discountKzt = Number(detail.discount_kzt ?? 0);
+                const total = Math.max(0, subtotal - discountKzt);
+                return (
+                  <div className="border-t border-[var(--border)] pt-3 space-y-1">
+                    {discountKzt > 0 && (
+                      <>
+                        <div className="flex justify-between text-sm text-[var(--text-secondary)]">
+                          <span>Сумма</span>
+                          <span>{formatPrice(subtotal)}</span>
+                        </div>
+                        {(detail.applied_discounts ?? []).map((a) => (
+                          <div key={a.discount_id} className="flex justify-between text-sm" style={{ color: "#4ade80" }}>
+                            <span>{a.name}</span>
+                            <span>−{formatPrice(a.amount_kzt)}</span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="font-semibold text-[var(--text-primary)]">Итого</span>
+                      <span className="font-bold text-lg text-gold-gradient">{formatPrice(total)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>

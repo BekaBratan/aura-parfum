@@ -9,6 +9,7 @@ export type CartProductSnapshot = {
   price_usd: number;
   volume_ml: number | null;
   image_url: string | null;
+  image_thumb_url?: string | null;
   count: number | null;
   unit: ProductUnit;
   category: ProductCategory;
@@ -89,6 +90,7 @@ export const useCartStore = create<CartStore>()(
               price_usd: Number(product.price_usd),
               volume_ml: item.unit === "ml" ? item.quantity : product.volume_ml,
               image_url: product.image_url,
+              image_thumb_url: product.image_thumb_url ?? item.image_thumb_url ?? null,
               count: Number(product.count ?? 0),
               unit: product.unit,
               category: product.category,

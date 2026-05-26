@@ -8,6 +8,8 @@ import { ArrowLeft, Loader2, Send, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPriceUsd, UNIT_LABELS, itemPriceKzt } from "@/lib/utils";
 import { getOrderItemDetails } from "@/lib/orderItemDetails";
+import { useActiveDiscounts } from "@/lib/useDiscounts";
+import { calculateDiscounts } from "@/lib/discounts";
 import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
@@ -74,11 +76,11 @@ export default function CheckoutPage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from("products")
-        .select("id, name, brand, price_usd, volume_ml, image_url, count, unit, category")
+        .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category")
         .in("id", productIds);
 
       if (error || !data) {
-        toast.error("Не удалось обновить остатки товаров");
+        console.error("Checkout stock refresh failed:", error);
         return currentItems;
       }
 
@@ -104,6 +106,20 @@ export default function CheckoutPage() {
 
     void refreshCartProducts();
   }, [mounted, productIdsKey, refreshCartProducts]);
+
+  const activeDiscounts = useActiveDiscounts();
+  const discountResult = useMemo(
+    () => calculateDiscounts(items, activeDiscounts, kztRate),
+    [items, activeDiscounts, kztRate],
+  );
+  const lineByProductId = useMemo(
+    () => new Map(discountResult.lines.map((l) => [l.product_id, l])),
+    [discountResult.lines],
+  );
+  const ruleNameById = useMemo(
+    () => new Map(discountResult.applied.map((a) => [a.discount_id, a.name])),
+    [discountResult.applied],
+  );
 
   if (!mounted) return null;
 
@@ -172,17 +188,31 @@ export default function CheckoutPage() {
         return;
       }
 
-      const orderItems = currentItems.map((item) => ({
-        product_id: item.product_id,
-        name: item.name,
-        brand: item.brand,
-        price_usd: item.category === "accessory"
-          ? Number(item.price_usd) / kztRate
-          : Number(item.price_usd),
-        quantity: Number(item.quantity),
-        volume_ml: item.volume_ml,
-        image_url: item.image_url,
-      }));
+      // Recompute the discount against the freshest cart (after stock refresh).
+      const freshDiscount = calculateDiscounts(currentItems, activeDiscounts, kztRate);
+      const lineById = new Map(freshDiscount.lines.map((l) => [l.product_id, l]));
+      const ruleNameById = new Map(freshDiscount.applied.map((a) => [a.discount_id, a.name]));
+
+      const orderItems = currentItems.map((item) => {
+        const line = lineById.get(item.product_id);
+        const ruleId = line?.appliedDiscountId ?? null;
+        const ruleName = ruleId ? ruleNameById.get(ruleId) ?? null : null;
+        return {
+          product_id: item.product_id,
+          name: item.name,
+          brand: item.brand,
+          price_usd: item.category === "accessory"
+            ? Number(item.price_usd) / kztRate
+            : Number(item.price_usd),
+          quantity: Number(item.quantity),
+          volume_ml: item.volume_ml,
+          image_url: item.image_url,
+          // Per-line discount snapshot — RPC merges these into the stored item JSON.
+          discount_kzt: line && line.discountKzt > 0 ? Math.round(line.discountKzt) : null,
+          applied_discount_name: line && line.discountKzt > 0 ? ruleName : null,
+        };
+      });
+
       const supabase = createClient();
       const { data, error } = await supabase.rpc("create_order_with_stock_check", {
         p_customer_name: form.customer_name,
@@ -193,6 +223,8 @@ export default function CheckoutPage() {
         p_items: orderItems,
         p_currency_code: "KZT",
         p_rate_to_usd: kztRate,
+        p_discount_kzt: freshDiscount.discountKzt,
+        p_applied_discounts: freshDiscount.applied,
       });
 
       if (error) {
@@ -213,7 +245,7 @@ export default function CheckoutPage() {
 
       clearCart();
       toast.success("Заказ создан");
-      router.push(`/invoice/${createdOrder.order_id}`);
+      router.push(`/order/success?orderId=${createdOrder.order_id}`);
     } catch {
       toast.error("Что-то пошло не так");
       setSubmitting(false);
@@ -311,6 +343,12 @@ export default function CheckoutPage() {
               {items.map((item) => {
                 const unitLabel = UNIT_LABELS[item.unit ?? "pcs"];
                 const details = getOrderItemDetails(item);
+                const line = lineByProductId.get(item.product_id);
+                const baseKzt = itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity;
+                const ruleName = line?.appliedDiscountId
+                  ? ruleNameById.get(line.appliedDiscountId)
+                  : null;
+                const hasDiscount = line && line.discountKzt > 0;
                 return (
                   <div key={item.product_id} className="order-item">
                     <div className="order-item-main">
@@ -335,15 +373,41 @@ export default function CheckoutPage() {
                         ))}
                       </div>
                       <p className="product-meta">{item.quantity} {unitLabel}</p>
+                      {hasDiscount && (
+                        <p className="line-discount-note">
+                          {ruleName ? `«${ruleName}» ` : ""}−{formatKzt(line.discountKzt)}
+                        </p>
+                      )}
                     </div>
-                    <strong>{formatKzt(itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity)}</strong>
+                    <div style={{ textAlign: "right" }}>
+                      {hasDiscount && (
+                        <p className="price-old">{formatKzt(baseKzt)}</p>
+                      )}
+                      <strong>{formatKzt(hasDiscount ? line.finalKzt : baseKzt)}</strong>
+                    </div>
                   </div>
                 );
               })}
             </div>
+            {discountResult.discountKzt > 0 && (
+              <>
+                <div className="summary-row text-[var(--color-muted)]">
+                  <span>Сумма</span>
+                  <span>{formatKzt(discountResult.subtotalKzt)}</span>
+                </div>
+                {discountResult.applied.map((a) => (
+                  <div key={a.discount_id} className="summary-row" style={{ color: "var(--color-success)" }}>
+                    <span>{a.name}</span>
+                    <span>−{formatKzt(a.amount_kzt)}</span>
+                  </div>
+                ))}
+              </>
+            )}
             <div className="summary-row order-total-row">
               <span>Итого</span>
-              <span className="summary-total">{formatKzt(totalKzt(kztRate))}</span>
+              <span className="summary-total">
+                {formatKzt(discountResult.discountKzt > 0 ? discountResult.totalKzt : totalKzt(kztRate))}
+              </span>
             </div>
           </aside>
         </div>
