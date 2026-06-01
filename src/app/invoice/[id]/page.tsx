@@ -10,7 +10,7 @@ import { Download, Loader2, Send, XCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
-import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/utils";
+import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, isKztPriced } from "@/lib/utils";
 import { formatOrderItemDetails, getOrderItemDetails } from "@/lib/orderItemDetails";
 import { useCurrencyStore } from "@/store/currencyStore";
 
@@ -88,10 +88,10 @@ function getQtyLabel(item: Order["items"][number]) {
   return unit === "ml" ? `${item.quantity} мл` : `${item.quantity} шт.`;
 }
 
-// price_usd in order items: accessories = raw KZT, oils/perfumes = USD per ml
-// (the RPC stores prices from products table directly)
+// For KZT-priced categories (accessory, original, analog) price_usd already holds KZT.
+// For oil/perfume it's real USD and needs conversion.
 function itemKzt(item: Order["items"][number], kztRate: number): number {
-  return item.category === "accessory"
+  return isKztPriced(item.category)
     ? item.price_usd
     : item.price_usd * kztRate;
 }

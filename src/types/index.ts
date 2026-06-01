@@ -1,4 +1,4 @@
-export type ProductCategory = "oil" | "perfume" | "accessory";
+export type ProductCategory = "oil" | "perfume" | "accessory" | "original" | "analog";
 export type ProductUnit = "ml" | "pcs";
 
 export interface Product {
@@ -69,6 +69,7 @@ export type DiscountTriggerType =
   | "category_per_product";
 export type DiscountApplyTo = "all_cart" | "category" | "trigger_product" | "specific_products";
 export type DiscountType = "percentage" | "fixed";
+export type DiscountCurrencyCode = "USD" | "KZT";
 
 export interface Discount {
   id: string;
@@ -91,7 +92,11 @@ export interface Discount {
 
   // Value
   discount_type: DiscountType;
-  discount_value: number;                    // percentage: 0–100, fixed: KZT
+  discount_value: number;                    // percentage: 0–100, fixed: in currency_code
+
+  // Currency for the trigger threshold AND fixed discount value.
+  // Percentage discounts ignore this. Existing rows default to 'USD'.
+  currency_code: DiscountCurrencyCode;
 
   // Validity window (null = no bound on that side)
   valid_from: string | null;

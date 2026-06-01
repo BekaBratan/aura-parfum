@@ -4,6 +4,7 @@ import type {
   Discount,
   ProductCategory,
 } from "@/types";
+import { isKztPriced } from "@/lib/utils";
 
 // ─── Pure utilities ────────────────────────────────────────────────────────
 
@@ -13,7 +14,7 @@ import type {
  * USD trigger thresholds.
  */
 function lineUsd(item: CartItem, kztRate: number): number {
-  if (item.category === "accessory") {
+  if (isKztPriced(item.category)) {
     return kztRate > 0 ? (item.price_usd / kztRate) * item.quantity : 0;
   }
   return item.price_usd * item.quantity;
@@ -25,7 +26,7 @@ function lineUsd(item: CartItem, kztRate: number): number {
  * computing percentage cuts.
  */
 function lineKzt(item: CartItem, kztRate: number): number {
-  if (item.category === "accessory") return item.price_usd * item.quantity;
+  if (isKztPriced(item.category)) return item.price_usd * item.quantity;
   return item.price_usd * kztRate * item.quantity;
 }
 
@@ -35,18 +36,26 @@ function isWithinValidity(d: Discount, now: Date): boolean {
   return true;
 }
 
-function triggerMet(d: Discount, items: CartItem[], lineUsds: number[]): boolean {
+// Pick the appropriate line-amount table for a rule based on its currency_code.
+// USD rules compare against the cart's USD subtotals; KZT rules use KZT subtotals.
+function lineBaseFor(d: Discount, lineUsds: number[], lineKzts: number[]): number[] {
+  return d.currency_code === "KZT" ? lineKzts : lineUsds;
+}
+
+function triggerMet(d: Discount, items: CartItem[], lineUsds: number[], lineKzts: number[]): boolean {
+  const lineBase = lineBaseFor(d, lineUsds, lineKzts);
+
   switch (d.trigger_type) {
     case "all_cart": {
-      const totalUsd = lineUsds.reduce((s, u) => s + u, 0);
-      return totalUsd >= (d.trigger_threshold_amount ?? 0);
+      const total = lineBase.reduce((s, u) => s + u, 0);
+      return total >= (d.trigger_threshold_amount ?? 0);
     }
     case "category_total": {
       const cats = d.trigger_category_ids ?? [];
       if (cats.length === 0) return false;
       let matched = 0;
       items.forEach((it, i) => {
-        if (cats.includes(it.category)) matched += lineUsds[i];
+        if (cats.includes(it.category)) matched += lineBase[i];
       });
       return matched >= (d.trigger_threshold_amount ?? 0);
     }
@@ -60,7 +69,7 @@ function triggerMet(d: Discount, items: CartItem[], lineUsds: number[]): boolean
       // lineMatchesApply re-checks per line so only qualifying lines get the discount.
       return items.some((it, i) => {
         if (!cats.includes(it.category)) return false;
-        if (threshold != null && lineUsds[i] < threshold) return false;
+        if (threshold != null && lineBase[i] < threshold) return false;
         if (minQty != null && it.quantity < minQty) return false;
         return true;
       });
@@ -72,19 +81,19 @@ function triggerMet(d: Discount, items: CartItem[], lineUsds: number[]): boolean
 
       // Each listed product must appear in the cart with qty >= minQty.
       const qtyByProduct = new Map<string, number>();
-      const usdByProduct = new Map<string, number>();
+      const amountByProduct = new Map<string, number>();
       items.forEach((it, i) => {
         if (!required.includes(it.product_id)) return;
         qtyByProduct.set(it.product_id, (qtyByProduct.get(it.product_id) ?? 0) + it.quantity);
-        usdByProduct.set(it.product_id, (usdByProduct.get(it.product_id) ?? 0) + lineUsds[i]);
+        amountByProduct.set(it.product_id, (amountByProduct.get(it.product_id) ?? 0) + lineBase[i]);
       });
       for (const pid of required) {
         if ((qtyByProduct.get(pid) ?? 0) < minQty) return false;
       }
-      // Optional combined-USD threshold across the listed products (AND with qty).
+      // Optional combined threshold across the listed products (AND with qty).
       if (d.trigger_threshold_amount != null) {
         let combined = 0;
-        for (const v of usdByProduct.values()) combined += v;
+        for (const v of amountByProduct.values()) combined += v;
         if (combined < d.trigger_threshold_amount) return false;
       }
       return true;
@@ -92,7 +101,7 @@ function triggerMet(d: Discount, items: CartItem[], lineUsds: number[]): boolean
   }
 }
 
-function lineMatchesApply(d: Discount, item: CartItem, lineUsd: number): boolean {
+function lineMatchesApply(d: Discount, item: CartItem, lineAmount: number): boolean {
   switch (d.apply_to) {
     case "all_cart":          return true;
     case "category":          return (d.apply_category_ids ?? []).includes(item.category);
@@ -103,7 +112,7 @@ function lineMatchesApply(d: Discount, item: CartItem, lineUsd: number): boolean
       if (d.trigger_type === "category_per_product") {
         const cats = d.trigger_category_ids ?? [];
         if (!cats.includes(item.category)) return false;
-        if (d.trigger_threshold_amount != null && lineUsd < d.trigger_threshold_amount) return false;
+        if (d.trigger_threshold_amount != null && lineAmount < d.trigger_threshold_amount) return false;
         if (d.trigger_min_quantity != null && item.quantity < d.trigger_min_quantity) return false;
         return true;
       }
@@ -113,14 +122,18 @@ function lineMatchesApply(d: Discount, item: CartItem, lineUsd: number): boolean
   }
 }
 
-function calcDiscountAmount(d: Discount, baseKzt: number): number {
+function calcDiscountAmount(d: Discount, baseKzt: number, kztRate: number): number {
   if (baseKzt <= 0) return 0;
   if (d.discount_type === "percentage") {
     const pct = Math.min(100, Math.max(0, d.discount_value));
     return Math.round(baseKzt * (pct / 100));
   }
-  // fixed: KZT. Cap so the line never goes negative.
-  return Math.min(d.discount_value, baseKzt);
+  // fixed: amount is stored in `currency_code`. Convert USD-denominated rules
+  // to KZT at the current rate so we can subtract from a KZT line subtotal.
+  const valueKzt = d.currency_code === "USD"
+    ? d.discount_value * kztRate
+    : d.discount_value;
+  return Math.min(Math.round(valueKzt), baseKzt);
 }
 
 // ─── Public engine ─────────────────────────────────────────────────────────
@@ -175,15 +188,18 @@ export function calculateDiscounts(
 
   // Active + in window + trigger-condition satisfied.
   const candidates = discounts.filter(
-    (d) => d.is_active && isWithinValidity(d, now) && triggerMet(d, cartItems, lineUsds),
+    (d) => d.is_active && isWithinValidity(d, now) && triggerMet(d, cartItems, lineUsds, lineKzts),
   );
 
   const lines: DiscountedLine[] = cartItems.map((item, i) => {
     const baseKzt = lineKzts[i];
     let best: { d: Discount; amount: number } | null = null;
     for (const d of candidates) {
-      if (!lineMatchesApply(d, item, lineUsds[i])) continue;
-      const amount = calcDiscountAmount(d, baseKzt);
+      // For per-line apply rules the engine re-checks the threshold against the
+      // line subtotal in the rule's own currency.
+      const lineForApply = d.currency_code === "KZT" ? lineKzts[i] : lineUsds[i];
+      if (!lineMatchesApply(d, item, lineForApply)) continue;
+      const amount = calcDiscountAmount(d, baseKzt, kztRate);
       if (amount <= 0) continue;
       if (
         !best ||
@@ -246,39 +262,44 @@ export function calculateDiscounts(
 // ─── Display helpers (admin list) ──────────────────────────────────────────
 
 const CATEGORY_LABEL: Record<ProductCategory, string> = {
-  oil: "Масла", perfume: "Парфюм", accessory: "Аксессуары",
+  oil: "Масла", perfume: "Парфюм", original: "Оригинал", analog: "Аналог", accessory: "Аксессуары",
 };
 
-export function describeDiscountValue(d: Pick<Discount, "discount_type" | "discount_value">): string {
-  return d.discount_type === "percentage"
-    ? `${d.discount_value}%`
-    : `${Math.round(d.discount_value).toLocaleString("ru-RU")} ₸`;
+export function describeDiscountValue(
+  d: Pick<Discount, "discount_type" | "discount_value" | "currency_code">,
+): string {
+  if (d.discount_type === "percentage") return `${d.discount_value}%`;
+  const unit = d.currency_code === "KZT" ? "₸" : "$";
+  return `${Math.round(d.discount_value).toLocaleString("ru-RU")} ${unit}`;
 }
 
 export function describeDiscountTrigger(
   d: Pick<Discount,
     "trigger_type" | "trigger_category_ids" | "trigger_product_ids"
-    | "trigger_threshold_amount" | "trigger_min_quantity"
+    | "trigger_threshold_amount" | "trigger_min_quantity" | "currency_code"
   >,
 ): string {
-  const usd = (n: number | null | undefined) =>
-    n != null ? `$${Math.round(n).toLocaleString("ru-RU")}` : null;
+  const amount = (n: number | null | undefined) => {
+    if (n == null) return null;
+    const formatted = Math.round(n).toLocaleString("ru-RU");
+    return d.currency_code === "KZT" ? `${formatted} ₸` : `$${formatted}`;
+  };
 
   switch (d.trigger_type) {
     case "all_cart": {
-      const t = usd(d.trigger_threshold_amount);
+      const t = amount(d.trigger_threshold_amount);
       return t ? `Корзина ≥ ${t}` : "Любая корзина";
     }
     case "category_total": {
       const cats = (d.trigger_category_ids ?? []).map((c) => CATEGORY_LABEL[c]).join(", ") || "—";
-      const t = usd(d.trigger_threshold_amount);
+      const t = amount(d.trigger_threshold_amount);
       return t ? `${cats} ≥ ${t}` : cats;
     }
     case "category_per_product": {
       const cats = (d.trigger_category_ids ?? []).map((c) => CATEGORY_LABEL[c]).join(", ") || "—";
       const parts: string[] = [];
       if (d.trigger_min_quantity != null) parts.push(`≥ ${d.trigger_min_quantity} шт.`);
-      const t = usd(d.trigger_threshold_amount);
+      const t = amount(d.trigger_threshold_amount);
       if (t) parts.push(`сумма ≥ ${t}`);
       return parts.length === 0
         ? `Каждый товар в ${cats}`
@@ -288,7 +309,7 @@ export function describeDiscountTrigger(
       const n = (d.trigger_product_ids ?? []).length;
       const parts: string[] = [`${n} товар(ов)`];
       if (d.trigger_min_quantity != null) parts.push(`≥ ${d.trigger_min_quantity} шт. каждого`);
-      const t = usd(d.trigger_threshold_amount);
+      const t = amount(d.trigger_threshold_amount);
       if (t) parts.push(`сумма ≥ ${t}`);
       return parts.join(", ");
     }

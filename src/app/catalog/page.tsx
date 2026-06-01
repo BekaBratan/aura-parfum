@@ -33,14 +33,16 @@ const CATEGORY_ATTRIBUTE_FILTERS: Record<
 > = {
   oil: [{ key: "quality", label: "Тип" }],
   perfume: [{ key: "quality", label: "Тип" }],
+  original: [{ key: "quality", label: "Тип" }],
+  analog: [{ key: "quality", label: "Тип" }],
   accessory: [{ key: "type", label: "Вид" }],
 };
 
 // Categories where the gender quick-filter row is shown
-const CATEGORIES_WITH_GENDER: ProductCategory[] = ["oil", "perfume"];
+const CATEGORIES_WITH_GENDER: ProductCategory[] = ["oil", "perfume", "original", "analog"];
 
 // Categories where country filter is shown
-const CATEGORIES_WITH_COUNTRY: ProductCategory[] = ["oil", "perfume"];
+const CATEGORIES_WITH_COUNTRY: ProductCategory[] = ["oil", "perfume", "original", "analog"];
 
 const DEFAULT_FILTERS: FilterState = {
   search: "",
@@ -68,7 +70,11 @@ function pluralItems(n: number): string {
 const DEFAULT_CATEGORY: ProductCategory = CATEGORY_ORDER[0];
 
 function isValidCategory(value: string | null): value is ProductCategory {
-  return value === "oil" || value === "perfume" || value === "accessory";
+  return (
+    value === "oil" || value === "perfume"
+    || value === "original" || value === "analog"
+    || value === "accessory"
+  );
 }
 
 function CatalogContent() {

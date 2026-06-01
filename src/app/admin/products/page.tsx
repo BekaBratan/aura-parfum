@@ -6,7 +6,7 @@ import imageCompression from "browser-image-compression";
 import toast from "react-hot-toast";
 import { useAdminRole } from "@/lib/adminRole";
 import { createClient } from "@/lib/supabase/client";
-import { CATEGORY_LABELS, UNIT_LABELS, GENDER_LABELS } from "@/lib/utils";
+import { CATEGORY_LABELS, UNIT_LABELS, GENDER_LABELS, isKztPriced } from "@/lib/utils";
 import { formatKzt, convertToKzt } from "@/lib/currency";
 import { Product, ProductCategory } from "@/types";
 import Pagination from "@/components/ui/Pagination";
@@ -65,6 +65,14 @@ const CATEGORY_ATTR_FIELDS: Record<ProductCategory, AttrField[]> = {
     { key: "quality", label: "Качество", placeholder: "" },
   ],
   perfume: [
+    { key: "gender",  label: "Пол",      placeholder: "" },
+    { key: "quality", label: "Качество", placeholder: "" },
+  ],
+  original: [
+    { key: "gender",  label: "Пол",      placeholder: "" },
+    { key: "quality", label: "Качество", placeholder: "" },
+  ],
+  analog: [
     { key: "gender",  label: "Пол",      placeholder: "" },
     { key: "quality", label: "Качество", placeholder: "" },
   ],
@@ -311,7 +319,8 @@ export default function AdminProducts() {
 
   const supabase = createClient();
   const imagePreviewSrc = selectedImagePreviewUrl || form.image_url.trim();
-  const isMl = form.category !== "accessory";
+  // Oil and perfume are sold per ml; accessory / original / analog are pcs (KZT-priced).
+  const isMl = !isKztPriced(form.category);
 
   const resetSelectedImage = () => {
     setSelectedImageFile(null);
@@ -418,7 +427,7 @@ export default function AdminProducts() {
       // Prefill name/code/price/count for new products if the operator hasn't typed anything yet
       name: prev.name || a.name,
       code: prev.code || a.code,
-      price: prev.price || (prev.category === "accessory" ? String(Math.round(a.price)) : prev.price),
+      price: prev.price || (isKztPriced(prev.category) ? String(Math.round(a.price)) : prev.price),
       count: prev.count || String(a.stock),
     }));
     setAinurPickerOpen(false);
@@ -497,7 +506,7 @@ export default function AdminProducts() {
       const imageThumbUrl = uploadedImage?.thumbPublicUrl
         || (uploadedImage ? null : form.image_thumb_url || null);
 
-      const unit = form.category === "accessory" ? "pcs" : "ml";
+      const unit = isKztPriced(form.category) ? "pcs" : "ml";
 
       // Build attributes object
       const attrs: Record<string, string> = {};
@@ -622,7 +631,7 @@ export default function AdminProducts() {
     if (name === "price") {
       setForm((prev) => ({
         ...prev,
-        price: prev.category === "accessory"
+        price: isKztPriced(prev.category)
           ? normalizeIntInput(value)
           : normalizeDecimalInput(value),
       }));
@@ -656,7 +665,8 @@ export default function AdminProducts() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   const isAccessory = form.category === "accessory";
-  const priceLabel = isAccessory ? "Цена, ₸" : isMl ? "Цена, $/мл" : "Цена, $";
+  const isKztInput = isKztPriced(form.category);
+  const priceLabel = isKztInput ? "Цена, ₸" : isMl ? "Цена, $/мл" : "Цена, $";
   const countLabel = isMl ? "Запас, мл" : "Остаток, шт.";
   const countHelp = isMl ? "Общий запас в мл" : "Если товара нет, поставьте 0";
   const attrFields = CATEGORY_ATTR_FIELDS[form.category];

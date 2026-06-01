@@ -1,6 +1,7 @@
 import { CartItem, ProductUnit, ProductCategory } from "@/types";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { isKztPriced } from "@/lib/utils";
 
 export type CartProductSnapshot = {
   id: string;
@@ -113,7 +114,7 @@ export const useCartStore = create<CartStore>()(
 
       totalKzt: (kztRate: number) =>
         get().items.reduce((sum, i) => {
-          const kzt = i.category === "accessory" ? i.price_usd : i.price_usd * kztRate;
+          const kzt = isKztPriced(i.category) ? i.price_usd : i.price_usd * kztRate;
           return sum + kzt * i.quantity;
         }, 0),
     }),

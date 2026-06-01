@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { ArrowLeft, Loader2, Send, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatPriceUsd, UNIT_LABELS, itemPriceKzt } from "@/lib/utils";
+import { formatPriceUsd, UNIT_LABELS, itemPriceKzt, isKztPriced } from "@/lib/utils";
 import { getOrderItemDetails } from "@/lib/orderItemDetails";
 import { useActiveDiscounts } from "@/lib/useDiscounts";
 import { calculateDiscounts } from "@/lib/discounts";
@@ -201,7 +201,7 @@ export default function CheckoutPage() {
           product_id: item.product_id,
           name: item.name,
           brand: item.brand,
-          price_usd: item.category === "accessory"
+          price_usd: isKztPriced(item.category)
             ? Number(item.price_usd) / kztRate
             : Number(item.price_usd),
           quantity: Number(item.quantity),

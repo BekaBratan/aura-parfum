@@ -29,6 +29,7 @@ import { useCurrencyStore } from "@/store/currencyStore";
 import type {
   Discount,
   DiscountApplyTo,
+  DiscountCurrencyCode,
   DiscountTriggerType,
   DiscountType,
   Product,
@@ -47,7 +48,7 @@ interface FormState {
   trigger_type: DiscountTriggerType;
   trigger_category_ids: ProductCategory[];
   trigger_product_ids: string[];
-  trigger_threshold_amount: string;          // USD, as text
+  trigger_threshold_amount: string;          // amount in `currency_code`, as text
   trigger_min_quantity: string;
 
   apply_to: DiscountApplyTo;
@@ -56,6 +57,7 @@ interface FormState {
 
   discount_type: DiscountType;
   discount_value: string;
+  currency_code: DiscountCurrencyCode;       // applies to threshold + fixed discount
 
   valid_from: string;                        // datetime-local
   valid_until: string;
@@ -77,6 +79,7 @@ const empty: FormState = {
   apply_product_ids: [],
   discount_type: "percentage",
   discount_value: "10",
+  currency_code: "KZT",
   valid_from: "",
   valid_until: "",
 };
@@ -84,6 +87,8 @@ const empty: FormState = {
 const CATEGORY_OPTIONS: { value: ProductCategory; label: string }[] = [
   { value: "oil", label: "Масла" },
   { value: "perfume", label: "Парфюм" },
+  { value: "original", label: "Оригинал" },
+  { value: "analog", label: "Аналог" },
   { value: "accessory", label: "Аксессуары" },
 ];
 
@@ -133,6 +138,7 @@ function toFormState(d: Discount): FormState {
     apply_product_ids: d.apply_product_ids ?? [],
     discount_type: d.discount_type,
     discount_value: String(d.discount_value),
+    currency_code: d.currency_code ?? "USD",
     valid_from: isoToLocalInput(d.valid_from),
     valid_until: isoToLocalInput(d.valid_until),
   };
@@ -320,18 +326,32 @@ export default function AdminDiscountsPage() {
       apply_product_ids: form.apply_to === "specific_products" ? form.apply_product_ids : null,
       discount_type: form.discount_type,
       discount_value: value,
+      currency_code: form.currency_code,
       valid_from: validFrom,
       valid_until: validUntil,
     };
 
     setSaving(true);
-    const op = form.id
-      ? supabase.from("discounts").update(payload).eq("id", form.id)
-      : supabase.from("discounts").insert(payload);
-    const { error } = await op;
+
+    const save = async (p: typeof payload | Omit<typeof payload, "currency_code">) => {
+      const op = form.id
+        ? supabase.from("discounts").update(p).eq("id", form.id)
+        : supabase.from("discounts").insert(p);
+      return (await op).error?.message ?? null;
+    };
+
+    let saveError = await save(payload);
+    // Graceful fallback if the currency_code column hasn't been migrated yet.
+    if (saveError?.includes("currency_code")) {
+      const { currency_code, ...rest } = payload;
+      void currency_code;
+      toast.error("Колонка currency_code ещё не создана. Запустите supabase/migrations/discounts_currency.sql");
+      saveError = await save(rest);
+    }
+
     setSaving(false);
 
-    if (error) { toast.error(error.message); return; }
+    if (saveError) { toast.error(saveError); return; }
     toast.success(form.id ? "Скидка обновлена" : "Скидка создана");
     setModalOpen(false);
     void loadAll();
@@ -353,13 +373,17 @@ export default function AdminDiscountsPage() {
     else void loadAll();
   };
 
-  // ─── Live KZT preview for USD inputs ─────────────────────────────────────
+  // ─── Live KZT preview, only meaningful when the rule is denominated in USD ────
 
   const liveKzt = (usdText: string): string => {
+    if (form.currency_code !== "USD") return "";
     const n = Number(usdText);
     if (!Number.isFinite(n) || n <= 0) return "";
     return formatKzt(convertToKzt(n, kztRate));
   };
+
+  const isKzt = form.currency_code === "KZT";
+  const currencySymbol = isKzt ? "₸" : "$";
 
   const showApplyTriggerProduct = form.trigger_type === "specific_products";
 
@@ -649,15 +673,15 @@ export default function AdminDiscountsPage() {
                 <div className="form-group">
                   <label className="form-label">
                     {form.trigger_type === "specific_products"
-                      ? "Мин. сумма по этим товарам, $ (необязательно)"
+                      ? `Мин. сумма по этим товарам, ${currencySymbol} (необязательно)`
                       : form.trigger_type === "category_per_product"
-                        ? "Порог суммы на каждый товар, $ (необязательно)"
-                        : "Порог, $"}
+                        ? `Порог суммы на каждый товар, ${currencySymbol} (необязательно)`
+                        : `Порог, ${currencySymbol}`}
                   </label>
                   <input
-                    type="number" min={0} step="0.01" value={form.trigger_threshold_amount}
+                    type="number" min={0} step={isKzt ? "1" : "0.01"} value={form.trigger_threshold_amount}
                     onChange={(e) => setForm({ ...form, trigger_threshold_amount: e.target.value })}
-                    placeholder={form.trigger_type === "all_cart" ? "например 100" : ""}
+                    placeholder={form.trigger_type === "all_cart" ? (isKzt ? "например 50000" : "например 100") : ""}
                     className="input-dark"
                   />
                   {liveKzt(form.trigger_threshold_amount) && (
@@ -774,16 +798,67 @@ export default function AdminDiscountsPage() {
                         : "bg-transparent border-[var(--border)] text-[var(--text-secondary)]"
                     }`}
                   >
-                    Фиксированная (₸)
+                    Фиксированная ({currencySymbol})
                   </button>
                 </div>
+
+                {/* Currency toggle — controls both the threshold and the fixed value */}
+                {form.discount_type === "fixed" && (
+                  <div className="form-group">
+                    <label className="form-label">Валюта порога и фиксированной скидки</label>
+                    <div className="flex gap-2">
+                      {(["KZT", "USD"] as DiscountCurrencyCode[]).map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setForm({ ...form, currency_code: c })}
+                          className={`flex-1 py-2 rounded-lg text-sm border transition-colors cursor-pointer ${
+                            form.currency_code === c
+                              ? "bg-[var(--gold)]/20 border-[var(--gold)] text-[var(--gold)]"
+                              : "bg-transparent border-[var(--border)] text-[var(--text-secondary)]"
+                          }`}
+                        >
+                          {c === "KZT" ? "Тенге (₸)" : "Доллар ($)"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="form-help">Действует и для порога условия, и для размера скидки.</p>
+                  </div>
+                )}
+                {form.discount_type === "percentage" && (
+                  <div className="form-group">
+                    <label className="form-label">Валюта порога условия</label>
+                    <div className="flex gap-2">
+                      {(["KZT", "USD"] as DiscountCurrencyCode[]).map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setForm({ ...form, currency_code: c })}
+                          className={`flex-1 py-2 rounded-lg text-sm border transition-colors cursor-pointer ${
+                            form.currency_code === c
+                              ? "bg-[var(--gold)]/20 border-[var(--gold)] text-[var(--gold)]"
+                              : "bg-transparent border-[var(--border)] text-[var(--text-secondary)]"
+                          }`}
+                        >
+                          {c === "KZT" ? "Тенге (₸)" : "Доллар ($)"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <input
                   type="number" min={0}
                   value={form.discount_value}
                   onChange={(e) => setForm({ ...form, discount_value: e.target.value })}
-                  placeholder={form.discount_type === "percentage" ? "10" : "5000"}
+                  placeholder={form.discount_type === "percentage" ? "10" : (isKzt ? "5000" : "50")}
                   className="input-dark"
                 />
+                {form.discount_type === "fixed" && liveKzt(form.discount_value) && (
+                  <p className="form-help" style={{ color: "var(--gold)" }}>
+                    ≈ {liveKzt(form.discount_value)}
+                  </p>
+                )}
               </div>
             </div>
 

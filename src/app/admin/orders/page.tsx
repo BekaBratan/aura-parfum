@@ -5,7 +5,7 @@ import { ChevronDown, Eye, Search, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
-import { formatPrice, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from "@/lib/utils";
+import { formatPrice, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, isKztPriced } from "@/lib/utils";
 import { getOrderItemDetails } from "@/lib/orderItemDetails";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { OrderItem } from "@/types";
@@ -25,9 +25,10 @@ const PAYMENT_STATUS_CLASSES: Record<string, string> = {
   refunded: "bg-purple-500/10 text-purple-400",
 };
 
-// accessories store raw KZT in price_usd; oils/perfumes store USD
+// For KZT-priced categories (accessory, original, analog) price_usd already holds KZT.
+// Oil/perfume store real USD and need conversion.
 function itemKzt(item: OrderItem, kztRate: number): number {
-  return item.category === "accessory" ? item.price_usd : item.price_usd * kztRate;
+  return isKztPriced(item.category) ? item.price_usd : item.price_usd * kztRate;
 }
 
 function orderTotalKzt(items: OrderItem[], kztRate: number): number {

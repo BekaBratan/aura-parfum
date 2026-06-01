@@ -11,6 +11,8 @@ export interface OrderItemDetail {
 const CATEGORY_NAMES: Record<string, string> = {
   oil: "Масло",
   perfume: "Парфюм",
+  original: "Оригинал",
+  analog: "Аналог",
   accessory: "Аксессуар",
 };
 

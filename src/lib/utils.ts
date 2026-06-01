@@ -1,9 +1,17 @@
 import type { ProductCategory, ProductUnit } from "@/types";
 import { formatKzt, convertToKzt } from "@/lib/currency";
 
-// For accessories price_usd stores raw KZT; for others it's real USD
+// Categories whose `price_usd` column stores a raw KZT amount (no USD conversion).
+// Same list also identifies categories sold by `pcs` rather than `ml`.
+export const KZT_PRICED_CATEGORIES: ProductCategory[] = ["accessory", "original", "analog"];
+
+export function isKztPriced(category: string | null | undefined): boolean {
+  return KZT_PRICED_CATEGORIES.includes(category as ProductCategory);
+}
+
+// For KZT-priced categories `price_usd` already holds KZT; for the rest convert from USD.
 export function itemPriceKzt(priceUsd: number, category: string, kztRate: number): number {
-  return category === "accessory" ? priceUsd : priceUsd * kztRate;
+  return isKztPriced(category) ? priceUsd : priceUsd * kztRate;
 }
 
 // Format a KZT amount (already converted)
@@ -37,6 +45,8 @@ export function getProductPrice(product: { price_usd?: number | null; price?: nu
 export const CATEGORY_LABELS: Record<ProductCategory, string> = {
   oil: "Масла",
   perfume: "Парфюм",
+  original: "Оригинал",
+  analog: "Аналог",
   accessory: "Аксессуары",
 };
 
@@ -51,7 +61,7 @@ export const GENDER_LABELS: Record<string, string> = {
   unisex: "Унисекс",
 };
 
-export const CATEGORY_ORDER: ProductCategory[] = ["oil", "perfume", "accessory"];
+export const CATEGORY_ORDER: ProductCategory[] = ["oil", "perfume", "original", "analog", "accessory"];
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   pending_payment: "Ожидает оплаты",

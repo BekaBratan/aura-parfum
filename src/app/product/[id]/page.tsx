@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
 import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
-import { formatPriceUsd, formatPricePerUnit, getProductPrice, GENDER_LABELS } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice, GENDER_LABELS, isKztPriced } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
 import { COUNTRY_CODES } from "@/lib/countries";
 import { useCartStore } from "@/store/cartStore";
@@ -257,7 +257,7 @@ export default function ProductPage() {
               <p className="price detail-price">
                 {isMl
                   ? formatPricePerUnit(priceUsd, "ml", kztRate)
-                  : product.category === "accessory"
+                  : isKztPriced(product.category)
                   ? formatKzt(priceUsd)
                   : formatPriceUsd(priceUsd, kztRate)}
               </p>

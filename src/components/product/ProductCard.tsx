@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Check, ShoppingBag, Trash2 } from "lucide-react";
-import { formatPriceUsd, formatPricePerUnit, getProductPrice } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice, isKztPriced } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
@@ -87,7 +87,7 @@ export default function ProductCard({
 
   const priceDisplay = isMl
     ? formatPricePerUnit(priceUsd, "ml", kztRate)
-    : product.category === "accessory"
+    : isKztPriced(product.category)
     ? formatKzt(priceUsd)
     : formatPriceUsd(priceUsd, kztRate);
 
