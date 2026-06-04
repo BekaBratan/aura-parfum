@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { AdminRoleProvider, StaffRole } from "@/lib/adminRole";
-import { LayoutDashboard, Package, Percent, ShoppingCart, LogOut, Menu, X, Users, DollarSign, ExternalLink, Settings } from "lucide-react";
+import { LayoutDashboard, Package, Percent, ShoppingCart, LogOut, Menu, X, Users, DollarSign, ExternalLink, Globe } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
@@ -92,7 +92,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       { href: "/admin/discounts", label: "Скидки", icon: Percent },
       { href: "/admin/staff", label: "Сотрудники", icon: Users },
       { href: "/admin/currencies", label: "Курсы валют", icon: DollarSign },
-      { href: "/admin/settings", label: "Настройки", icon: Settings },
+      { href: "/admin/settings", label: "Страны", icon: Globe },
     ] : []),
   ];
   const roleLabel = staffRole === "admin" ? "Администратор" : "Кассир";
@@ -115,7 +115,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         }`}
       >
         <div className="p-6 flex items-center justify-between shrink-0">
-          <Link href="/admin" className="text-xl font-bold text-gold-gradient" style={{ fontFamily: "'Playfair Display', serif" }}>AZ-ZAHRA Admin</Link>
+          <Link href="/admin" className="text-xl font-bold text-gold-gradient" style={{ fontFamily: "'Cormorant Garamond', 'Playfair Display', serif" }}>AZ-ZAHRA Admin</Link>
           <button
             onClick={() => setSideOpen(false)}
             aria-label="Закрыть меню"

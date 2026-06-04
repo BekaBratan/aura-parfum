@@ -6,9 +6,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Product } from "@/types";
 import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
-import { formatPriceUsd, formatPricePerUnit, getProductPrice, GENDER_LABELS, isKztPriced } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice, GENDER_LABELS, isKztPriced, itemPriceKzt } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
-import { COUNTRY_CODES } from "@/lib/countries";
+import { useCountryStore, getCountryCode } from "@/store/countryStore";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { ShoppingBag, ArrowLeft, Check, X as XIcon } from "lucide-react";
@@ -36,6 +36,7 @@ export default function ProductPage() {
   const addItem = useCartStore((s) => s.addItem);
   const cartItems = useCartStore((s) => s.items);
   const kztRate = useCurrencyStore((s) => s.kztRate);
+  const countryCodes = useCountryStore((s) => s.codes);
 
   const productCount = Number(product?.count ?? 0);
   const isAvailable = productCount > 0;
@@ -96,7 +97,7 @@ export default function ProductPage() {
       country_of_origin: product.country_of_origin ?? null,
       code: product.code ?? null,
     });
-    const totalKzt = formatPriceUsd(priceUsd * qty, kztRate);
+    const totalKzt = formatKzt(itemPriceKzt(priceUsd, product.category, kztRate) * qty);
     const label = isMl ? `${qty} мл → ${totalKzt}` : product.name;
     toast.success(`Добавлено: ${label}`);
   };
@@ -133,9 +134,10 @@ export default function ProductPage() {
   }
 
   const priceUsd = getProductPrice(product);
-  const totalKzt = formatPriceUsd(
-    isMl ? priceUsd * chosenVolume : priceUsd,
-    kztRate
+  // For oil/perfume: kzt = priceUsd × kztRate × chosenVolume.
+  // For KZT-priced (accessory/original/analog): kzt = priceUsd × chosenVolume directly.
+  const totalKzt = formatKzt(
+    itemPriceKzt(priceUsd, product.category, kztRate) * chosenVolume,
   );
   const availabilityText = isAvailable ? "В наличии" : "Нет в наличии";
 
@@ -151,9 +153,7 @@ export default function ProductPage() {
       ? [...rawEntries, ["gender", product.gender] as [string, string]]
       : rawEntries;
 
-  const countryCode = product.country_of_origin
-    ? COUNTRY_CODES[product.country_of_origin] ?? null
-    : null;
+  const countryCode = getCountryCode(countryCodes, product.country_of_origin);
 
   const categoryLabel =
     product.category === "oil" ? "Масло"

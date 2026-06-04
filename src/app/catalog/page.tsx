@@ -21,7 +21,8 @@ type CatalogViewMode = "grid" | "list";
 const CATALOG_VIEW_KEY = "catalogViewMode";
 
 const SORT_OPTIONS = [
-  { value: "newest", label: "Сначала новые" },
+  { value: "name_asc",  label: "По алфавиту: A → Z" },
+  { value: "name_desc", label: "По алфавиту: Z → A" },
   { value: "price_asc", label: "Цена: по возрастанию" },
   { value: "price_desc", label: "Цена: по убыванию" },
 ];
@@ -52,7 +53,7 @@ const DEFAULT_FILTERS: FilterState = {
   priceMin: null,
   priceMax: null,
   inStockOnly: false,
-  sortBy: "newest",
+  sortBy: "name_asc",
   category: null,
   attributeFilters: {},
   countries: [],
@@ -304,11 +305,12 @@ function CatalogContent() {
       case "price_desc":
         list.sort((a, b) => b.price_usd - a.price_usd);
         break;
+      case "name_desc":
+        list.sort((a, b) => b.name.localeCompare(a.name, "ru"));
+        break;
       default:
-        list.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
+        // name_asc — Russian locale collation (handles cyrillic + latin mix)
+        list.sort((a, b) => a.name.localeCompare(b.name, "ru"));
     }
 
     return list;

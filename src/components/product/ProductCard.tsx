@@ -9,7 +9,7 @@ import { useCurrencyStore } from "@/store/currencyStore";
 import { Product } from "@/types";
 import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
-import { COUNTRY_CODES } from "@/lib/countries";
+import { useCountryStore, getCountryCode } from "@/store/countryStore";
 import QuantityControls from "@/components/ui/QuantityControls";
 
 type ProductCardVariant = "grid" | "list";
@@ -91,9 +91,8 @@ export default function ProductCard({
     ? formatKzt(priceUsd)
     : formatPriceUsd(priceUsd, kztRate);
 
-  const countryCode = product.country_of_origin
-    ? COUNTRY_CODES[product.country_of_origin] ?? null
-    : null;
+  const countryCodes = useCountryStore((s) => s.codes);
+  const countryCode = getCountryCode(countryCodes, product.country_of_origin);
 
   const categoryLabel =
     product.category === "oil" ? "Масло"

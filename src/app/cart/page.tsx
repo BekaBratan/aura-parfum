@@ -14,7 +14,7 @@ import { calculateDiscounts } from "@/lib/discounts";
 import Link from "next/link";
 import { Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import QuantityControls from "@/components/ui/QuantityControls";
-import { COUNTRY_CODES } from "@/lib/countries";
+import { useCountryStore, getCountryCode } from "@/store/countryStore";
 import { GENDER_LABELS } from "@/lib/utils";
 import { CartItem } from "@/types";
 
@@ -60,6 +60,7 @@ export default function CartPage() {
   const totalUsd = useCartStore((s) => s.totalUsd);
   const totalKzt = useCartStore((s) => s.totalKzt);
   const kztRate = useCurrencyStore((s) => s.kztRate);
+  const countryCodes = useCountryStore((s) => s.codes);
   const clearCart = useCartStore((s) => s.clearCart);
   const syncItemsWithProducts = useCartStore((s) => s.syncItemsWithProducts);
   const [mounted, setMounted] = useState(false);
@@ -248,9 +249,7 @@ export default function CartPage() {
             const isAvailable = availableCount > 0;
             const stockWarning = stockWarningsById.get(item.product_id);
             const priceWasUpdated = priceUpdatedIds.has(item.product_id);
-            const countryCode = item.country_of_origin
-              ? COUNTRY_CODES[item.country_of_origin] ?? null
-              : null;
+            const countryCode = getCountryCode(countryCodes, item.country_of_origin);
             const gender = item.gender ?? (item.attributes?.gender as string | undefined);
             const quality = item.attributes?.quality as string | undefined;
             const accessoryType = item.attributes?.type as string | undefined;

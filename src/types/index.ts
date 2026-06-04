@@ -130,7 +130,7 @@ export interface FilterState {
   priceMin: number | null;
   priceMax: number | null;
   inStockOnly: boolean;
-  sortBy: "price_asc" | "price_desc" | "newest";
+  sortBy: "name_asc" | "name_desc" | "price_asc" | "price_desc";
   category: ProductCategory | null;
   attributeFilters: Record<string, string[]>;
   countries: string[];

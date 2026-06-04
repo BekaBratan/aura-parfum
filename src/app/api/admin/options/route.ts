@@ -26,7 +26,7 @@ export async function GET() {
 
   const { data, error } = await admin
     .from("product_options")
-    .select("id, type, value, created_at")
+    .select("id, type, value, code, created_at")
     .order("type")
     .order("value");
 
@@ -38,14 +38,18 @@ export async function POST(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { type, value } = await request.json();
+  const { type, value, code } = await request.json();
   if (!type || !value?.trim())
     return NextResponse.json({ error: "type and value required" }, { status: 400 });
 
+  const normalisedCode = typeof code === "string" && code.trim()
+    ? code.trim().toUpperCase()
+    : null;
+
   const { data, error } = await admin
     .from("product_options")
-    .insert({ type, value: value.trim() })
-    .select()
+    .insert({ type, value: value.trim(), code: normalisedCode })
+    .select("id, type, value, code, created_at")
     .single();
 
   if (error) {
@@ -53,6 +57,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Такое значение уже существует" }, { status: 409 });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  return NextResponse.json(data);
+}
+
+// Update just the `code` field of an existing option (used by the country list)
+export async function PATCH(request: Request) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { id, code } = await request.json();
+  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+  const normalisedCode = typeof code === "string" && code.trim()
+    ? code.trim().toUpperCase()
+    : null;
+
+  const { data, error } = await admin
+    .from("product_options")
+    .update({ code: normalisedCode })
+    .eq("id", id)
+    .select("id, type, value, code, created_at")
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
 

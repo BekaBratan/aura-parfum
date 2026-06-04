@@ -379,12 +379,13 @@ export default function AdminProducts() {
   const openEdit = (product: Product) => {
     if (!isAdmin) return;
     setEditId(product.id);
-    const isAccessory = (product.category ?? "perfume") === "accessory";
+    const editCategory = product.category ?? "perfume";
+    const editKzt = isKztPriced(editCategory);
     setForm({
       name: product.name,
       brand: product.brand,
       description: product.description || "",
-      price: isAccessory
+      price: editKzt
         ? String(Math.round(Number(product.price_usd)))
         : String(product.price_usd ?? ""),
       category: product.category ?? "perfume",
@@ -755,7 +756,14 @@ export default function AdminProducts() {
           <div className="admin-filter-group">
             <span className="admin-filter-label">Категория</span>
             <div className="admin-filter-pills">
-              {([["all", "Все"], ["oil", "Масла"], ["perfume", "Парфюм"], ["accessory", "Аксессуары"]] as const).map(([val, label]) => (
+              {([
+                ["all", "Все"],
+                ["oil", "Масла"],
+                ["perfume", "Парфюм"],
+                ["original", "Оригинал"],
+                ["analog", "Аналог"],
+                ["accessory", "Аксессуары"],
+              ] as const).map(([val, label]) => (
                 <button key={val} onClick={() => setFilterCategory(val)}
                   className={`admin-filter-pill${filterCategory === val ? " is-active" : ""}`}>
                   {label}
@@ -1003,7 +1011,7 @@ export default function AdminProducts() {
                       )}
                     </td>
                     <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">
-                      {cat === "accessory"
+                      {isKztPriced(cat)
                         ? formatKzt(product.price_usd)
                         : formatKzt(convertToKzt(product.price_usd, kztRate))}{unit === "ml" ? " /мл" : ""}
                     </td>
@@ -1084,6 +1092,8 @@ export default function AdminProducts() {
                 <select id="product-category" name="category" value={form.category} onChange={handleChange} className="input-dark">
                   <option value="oil">Масло</option>
                   <option value="perfume">Парфюм</option>
+                  <option value="original">Оригинал</option>
+                  <option value="analog">Аналог</option>
                   <option value="accessory">Аксессуар</option>
                 </select>
               </div>
@@ -1129,13 +1139,13 @@ export default function AdminProducts() {
                     id="product-price"
                     name="price"
                     type="text"
-                    inputMode={isAccessory ? "numeric" : "decimal"}
+                    inputMode={isKztInput ? "numeric" : "decimal"}
                     value={form.price}
                     onChange={handleChange}
-                    placeholder={isAccessory ? "Например: 3500" : isMl ? "Например: 2.50" : "Например: 5.00"}
+                    placeholder={isKztInput ? "Например: 3500" : isMl ? "Например: 2.50" : "Например: 5.00"}
                     className="input-dark"
                   />
-                  {!isAccessory && form.price && Number(form.price) > 0 && (
+                  {!isKztInput && form.price && Number(form.price) > 0 && (
                     <p className="form-help" style={{ color: "var(--gold)" }}>
                       ≈ {formatKzt(convertToKzt(Number(form.price), kztRate))}{isMl ? " / мл" : ""}
                     </p>
@@ -1213,7 +1223,8 @@ export default function AdminProducts() {
                 </div>
               )}
 
-              {/* Country of origin — oil and perfume only */}
+              {/* Country of origin — oil and perfume only. Code is managed per-country
+                  in /admin/settings, not here. */}
               {form.category !== "accessory" && (
                 <div className="form-group">
                   <label htmlFor="product-country" className="form-label">Страна происхождения</label>
@@ -1228,6 +1239,7 @@ export default function AdminProducts() {
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
+                  <p className="form-help">Список и коды стран меняются в Настройках.</p>
                 </div>
               )}
 
