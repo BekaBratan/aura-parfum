@@ -21,7 +21,7 @@ export async function buildAinurStockMap(storeId: string = DEFAULT_STORE_ID): Pr
 
   for (const p of products) {
     const rawCount = Number(p.stock?.[storeId] ?? 0);
-    const count = Number.isFinite(rawCount) && rawCount > 0 ? rawCount : 0;
+    const count = Number.isFinite(rawCount) && rawCount > 0 ? Math.floor(rawCount) : 0;
 
     // Always record by id, even when count is 0 — an explicit Supabase ↔ Ainur
     // link means we trust Ainur. Without this, a linked-but-zero product would

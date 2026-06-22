@@ -105,13 +105,14 @@ export default function AinurPicker({
                   <li key={p.id}>
                     <button
                       type="button"
-                      onClick={() => onPick(p)}
-                      className={`w-full text-left px-5 py-3 flex items-start gap-4 cursor-pointer transition-colors ${
+                      disabled={isTaken}
+                      onClick={() => !isTaken && onPick(p)}
+                      className={`w-full text-left px-5 py-3 flex items-start gap-4 transition-colors ${
                         isCurrent
-                          ? "bg-[var(--gold)]/10"
+                          ? "bg-[var(--gold)]/10 cursor-pointer"
                           : isTaken
-                          ? "opacity-60 hover:bg-white/[0.02]"
-                          : "hover:bg-white/[0.04]"
+                          ? "opacity-40 cursor-not-allowed"
+                          : "hover:bg-white/[0.04] cursor-pointer"
                       }`}
                     >
                       <div className="flex-1 min-w-0">

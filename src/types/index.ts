@@ -38,6 +38,7 @@ export interface OrderItem {
   gender?: string | null;
   country_of_origin?: string | null;
   code?: string | null;
+  ainur_id?: string | null;
   // Per-line discount snapshot (set at checkout if a rule applied to this line)
   discount_kzt?: number | null;
   applied_discount_name?: string | null;

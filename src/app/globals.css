@@ -810,6 +810,49 @@ img {
   width: 100%;
 }
 
+.product-card-volumes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+
+.volume-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.volume-pill:hover:not(.is-disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent-dark);
+  background: #ffffff;
+  transform: translateY(-1px);
+}
+
+.volume-pill.is-selected {
+  border-color: var(--color-accent-dark);
+  color: #ffffff;
+  background: var(--color-accent-dark);
+}
+
+.volume-pill.is-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: var(--color-surface-soft);
+  border-color: var(--color-border);
+}
+
 /* Unified quantity controls (input + ‑ / +) */
 .qty-controls {
   display: inline-flex;

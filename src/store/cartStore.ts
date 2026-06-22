@@ -18,6 +18,7 @@ export type CartProductSnapshot = {
   gender?: string | null;
   country_of_origin?: string | null;
   code?: string | null;
+  ainur_id?: string | null;
 };
 
 interface CartStore {
@@ -99,6 +100,7 @@ export const useCartStore = create<CartStore>()(
               gender: product.gender ?? item.gender ?? null,
               country_of_origin: product.country_of_origin ?? item.country_of_origin ?? null,
               code: product.code ?? item.code ?? null,
+              ainur_id: product.ainur_id ?? item.ainur_id ?? null,
             };
           }),
         });

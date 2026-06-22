@@ -13,7 +13,8 @@ import { calculateDiscounts } from "@/lib/discounts";
 import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
-import { CartItem } from "@/types";
+import { CartItem, Product } from "@/types";
+import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
 
 type StockIssue = {
   item: CartItem;
@@ -74,17 +75,41 @@ export default function CheckoutPage() {
 
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category")
-        .in("id", productIds);
+      const [{ data, error }, stockMap] = await Promise.all([
+        supabase
+          .from("products")
+          .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category, attributes, gender, country_of_origin, code, ainur_id")
+          .in("id", productIds),
+        fetchAinurStockMap().catch(() => null),
+      ]);
 
       if (error || !data) {
         console.error("Checkout stock refresh failed:", error);
         return currentItems;
       }
 
-      syncItemsWithProducts(data as CartProductSnapshot[]);
+      const fresh = data as Product[];
+      const overlaid = stockMap ? applyStockOverlay(fresh, stockMap) : fresh;
+
+      const snapshots: CartProductSnapshot[] = overlaid.map((p) => ({
+        id: p.id,
+        name: p.name,
+        brand: p.brand,
+        price_usd: Number(p.price_usd),
+        volume_ml: p.volume_ml,
+        image_url: p.image_url,
+        image_thumb_url: p.image_thumb_url ?? null,
+        count: Number(p.count ?? 0),
+        unit: p.unit,
+        category: p.category,
+        attributes: p.attributes ?? null,
+        gender: p.gender ?? null,
+        country_of_origin: p.country_of_origin ?? null,
+        code: p.code ?? null,
+        ainur_id: p.ainur_id ?? null,
+      }));
+
+      syncItemsWithProducts(snapshots);
 
       if (showToast) {
         toast.success("Остатки обновлены");

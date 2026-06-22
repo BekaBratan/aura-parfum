@@ -85,6 +85,29 @@ export default function ProductCard({
     toast.success(`${product.name} добавлен в корзину`);
   };
 
+  const handleVolumeClick = (e: React.MouseEvent, volume: number) => {
+    stop(e);
+    if (!isAvailable) return;
+    addItem({
+      product_id: product.id,
+      name: product.name,
+      brand: product.brand,
+      price_usd: priceUsd,
+      volume_ml: volume,
+      image_url: product.image_url,
+      image_thumb_url: product.image_thumb_url ?? null,
+      count: productCount,
+      unit: product.unit ?? "pcs",
+      category: product.category ?? "accessory",
+      quantity: volume,
+      attributes: product.attributes ?? null,
+      gender: product.gender ?? null,
+      country_of_origin: product.country_of_origin ?? null,
+      code: product.code ?? null,
+    });
+    toast.success(`${product.name} (${volume} мл) добавлен в корзину`);
+  };
+
   const priceDisplay = isMl
     ? formatPricePerUnit(priceUsd, "ml", kztRate)
     : isKztPriced(product.category)
@@ -235,6 +258,25 @@ export default function ProductCard({
                 {categoryLabel && (
                   <p className="product-category-label">{categoryLabel}</p>
                 )}
+                {isMl && isAvailable && (
+                  <div className="product-card-volumes" onClick={stop}>
+                    {[50, 250, 500, 1000].map((v) => {
+                      const isTaken = v > productCount;
+                      const isSelected = isInCart && cartItem.quantity === v;
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          disabled={isTaken}
+                          onClick={(e) => handleVolumeClick(e, v)}
+                          className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                        >
+                          {v} мл
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="product-list-meta">
                 <span className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
@@ -261,6 +303,25 @@ export default function ProductCard({
               {availabilityText}
             </p>
             <p className="price">{priceDisplay}</p>
+            {isMl && isAvailable && (
+              <div className="product-card-volumes" onClick={stop}>
+                {[50, 250, 500, 1000].map((v) => {
+                  const isTaken = v > productCount;
+                  const isSelected = isInCart && cartItem.quantity === v;
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      disabled={isTaken}
+                      onClick={(e) => handleVolumeClick(e, v)}
+                      className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                    >
+                      {v} мл
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             <div className="product-card-cart-row">
               {renderCartControls()}
             </div>

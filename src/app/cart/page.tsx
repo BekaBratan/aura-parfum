@@ -103,7 +103,7 @@ export default function CartPage() {
       const [{ data, error }, stockMap] = await Promise.all([
         supabase
           .from("products")
-          .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category, attributes, gender, country_of_origin, code")
+          .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category, attributes, gender, country_of_origin, code, ainur_id")
           .in("id", productIds),
         fetchAinurStockMap().catch(() => null),
       ]);
@@ -143,6 +143,8 @@ export default function CartPage() {
         attributes: p.attributes ?? null,
         gender: p.gender ?? null,
         country_of_origin: p.country_of_origin ?? null,
+        code: p.code ?? null,
+        ainur_id: p.ainur_id ?? null,
       }));
 
       syncItemsWithProducts(snapshots);
