@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Check, ShoppingBag, Trash2 } from "lucide-react";
 import { formatPriceUsd, formatPricePerUnit, getProductPrice, isKztPriced } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
@@ -176,8 +175,7 @@ export default function ProductCard({
   };
 
   return (
-    <Link
-      href={`/product/${product.id}`}
+    <div
       className={`product-card-link product-card-link--${variant}`}
     >
       <article className={cardClassName}>
@@ -328,6 +326,6 @@ export default function ProductCard({
           </div>
         )}
       </article>
-    </Link>
+    </div>
   );
 }

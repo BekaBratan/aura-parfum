@@ -547,7 +547,7 @@ img {
 
 .product-list {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .product-card-link {
@@ -570,12 +570,13 @@ img {
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.25s ease, box-shadow 0.3s ease, border-color 0.25s ease;
 }
 
 .product-card--grid:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 22px 50px rgba(34, 28, 20, 0.12);
+  transform: translateY(-4px);
+  border-color: rgba(184, 144, 79, 0.25);
+  box-shadow: 0 24px 52px rgba(34, 28, 20, 0.11), 0 4px 12px rgba(184, 144, 79, 0.06);
 }
 
 .product-card--compact {
@@ -585,7 +586,7 @@ img {
 .product-card-media,
 .product-card-image {
   position: relative;
-  aspect-ratio: 1 / 1.15;
+  aspect-ratio: 1 / 1.22;
   overflow: hidden;
   background: var(--color-surface-soft);
 }
@@ -600,7 +601,7 @@ img {
 }
 
 .product-card--grid:hover .product-card-img {
-  transform: scale(1.035);
+  transform: scale(1.05);
 }
 
 .image-placeholder {
@@ -642,8 +643,10 @@ img {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(138, 97, 22, 0.65);
-  border: none;
+  background: rgba(138, 97, 22, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -670,7 +673,17 @@ img {
   color: #fff;
   cursor: pointer;
   box-shadow: 0 12px 28px rgba(34, 28, 20, 0.2);
-  transition: background 0.2s, color 0.2s;
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.product-quick-add:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.product-quick-add:hover {
+  transform: scale(1.08);
+  box-shadow: 0 14px 32px rgba(34, 28, 20, 0.28);
 }
 
 .product-quick-add.is-in-cart {
@@ -732,15 +745,15 @@ img {
   flex: 1;
   flex-direction: column;
   min-width: 0;
-  padding: 12px;
+  padding: 14px;
 }
 
 .product-brand {
-  margin: 0 0 5px;
+  margin: 0 0 6px;
   color: var(--color-accent-dark);
   font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -751,7 +764,7 @@ img {
   margin: 0;
   color: var(--color-text);
   font-family: "Manrope", "Inter", system-ui, sans-serif;
-  font-size: 0.84rem;
+  font-size: 0.88rem;
   font-weight: 700;
   line-height: 1.3;
   overflow: hidden;
@@ -791,7 +804,7 @@ img {
   margin: auto 0 0;
   padding-top: 10px;
   color: var(--color-accent-dark);
-  font-size: 0.98rem;
+  font-size: 1.02rem;
   font-weight: 800;
 }
 
@@ -811,18 +824,20 @@ img {
 }
 
 .product-card-volumes {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin-top: 10px;
   margin-bottom: 6px;
 }
 
 .volume-pill {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: center;
   justify-content: center;
-  padding: 6px 10px;
+  min-height: 36px;
+  padding: 6px 12px;
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--color-muted);
@@ -830,7 +845,7 @@ img {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s, box-shadow 0.2s;
 }
 
 .volume-pill:hover:not(.is-disabled) {
@@ -838,12 +853,19 @@ img {
   color: var(--color-accent-dark);
   background: #ffffff;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(138, 106, 53, 0.12);
+}
+
+.volume-pill:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 .volume-pill.is-selected {
   border-color: var(--color-accent-dark);
   color: #ffffff;
   background: var(--color-accent-dark);
+  box-shadow: 0 4px 12px rgba(138, 106, 53, 0.25);
 }
 
 .volume-pill.is-disabled {
@@ -988,7 +1010,7 @@ img {
   background: #166534;
   color: #bbf7d0;
   pointer-events: none;
-  box-shadow: 0 8px 18px rgba(22, 101, 52, 0.3);
+  box-shadow: 0 6px 16px rgba(22, 101, 52, 0.35);
 }
 
 .product-card--grid .product-title {
