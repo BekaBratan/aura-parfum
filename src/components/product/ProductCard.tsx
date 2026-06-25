@@ -1,13 +1,15 @@
 "use client";
 
 import { Check, ShoppingBag, Trash2 } from "lucide-react";
-import { formatPriceUsd, formatPricePerUnit, getProductPrice, isKztPriced } from "@/lib/utils";
+import { formatPriceUsd, formatPricePerUnit, getProductPrice, isKztPriced, itemPriceKzt } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
-import { Product } from "@/types";
+import { useActiveDiscounts } from "@/lib/useDiscounts";
+import { calculateDiscounts } from "@/lib/discounts";
+import { Product, CartItem } from "@/types";
 import toast from "react-hot-toast";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCountryStore, getCountryCode } from "@/store/countryStore";
 import QuantityControls from "@/components/ui/QuantityControls";
 
@@ -31,6 +33,7 @@ export default function ProductCard({
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
   const kztRate = useCurrencyStore((s) => s.kztRate);
+  const activeDiscounts = useActiveDiscounts();
   const [imageError, setImageError] = useState(false);
 
   const cartItem = cartItems.find((i) => i.product_id === product.id);
@@ -41,6 +44,50 @@ export default function ProductCard({
   const isMl = product.unit === "ml";
   const minVolume = product.min_volume ?? 1;
   const priceUsd = getProductPrice(product);
+
+  const volumePriceInfo = useMemo(() => {
+    if (!isMl || !isInCart || !cartItem) return null;
+
+    const volume = cartItem.quantity;
+    const category = product.category ?? "oil";
+    const unitPrice = priceUsd;
+
+    if (activeDiscounts.length === 0) return null;
+
+    const virtualItem: CartItem = {
+      product_id: product.id,
+      name: product.name,
+      brand: product.brand,
+      price_usd: unitPrice,
+      volume_ml: volume,
+      image_url: product.image_url,
+      image_thumb_url: product.image_thumb_url ?? null,
+      unit: product.unit ?? "ml",
+      category,
+      quantity: volume,
+      count: productCount,
+      attributes: product.attributes ?? null,
+      gender: product.gender ?? null,
+      country_of_origin: product.country_of_origin ?? null,
+      code: product.code ?? null,
+    };
+
+    const result = calculateDiscounts([virtualItem], activeDiscounts, kztRate);
+    const line = result.lines[0];
+
+    if (line && line.discountKzt > 0) {
+      return {
+        baseKzt: line.baseKzt,
+        finalKzt: line.finalKzt,
+        discountKzt: line.discountKzt,
+        percentage: Math.round((line.discountKzt / line.baseKzt) * 100),
+        hasDiscount: true as const,
+      };
+    }
+
+    const base = itemPriceKzt(unitPrice, category, kztRate) * volume;
+    return { baseKzt: base, finalKzt: base, discountKzt: 0, percentage: 0, hasDiscount: false as const };
+  }, [isMl, isInCart, cartItem, priceUsd, product.id, product.name, product.brand, product.image_url, product.image_thumb_url, product.unit, product.category, product.attributes, product.gender, product.country_of_origin, product.code, productCount, activeDiscounts, kztRate]);
 
   const cardClassName = [
     "product-card",
@@ -285,7 +332,23 @@ export default function ProductCard({
 
             <div className="product-list-actions">
               <div>
-                <p className="price">{priceDisplay}</p>
+                {volumePriceInfo ? (
+                  <div className="volume-price-info">
+                    {volumePriceInfo.hasDiscount ? (
+                      <>
+                        <div className="volume-price-row">
+                          <span className="volume-price-old">{formatPricePerUnit(priceUsd, "ml", kztRate)}</span>
+                          <span className="discount-badge">−{volumePriceInfo.percentage}%</span>
+                        </div>
+                        <p className="volume-price-new is-discounted">{formatKzt(volumePriceInfo.finalKzt / cartItem!.quantity)} / мл</p>
+                      </>
+                    ) : (
+                      <p className="price">{formatPricePerUnit(priceUsd, "ml", kztRate)}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="price">{priceDisplay}</p>
+                )}
               </div>
               {renderCartControls()}
             </div>
@@ -300,7 +363,23 @@ export default function ProductCard({
             <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
               {availabilityText}
             </p>
-            <p className="price">{priceDisplay}</p>
+            {volumePriceInfo ? (
+              <div className="volume-price-info">
+                {volumePriceInfo.hasDiscount ? (
+                  <>
+                    <div className="volume-price-row">
+                      <span className="volume-price-old">{formatPricePerUnit(priceUsd, "ml", kztRate)}</span>
+                      <span className="discount-badge">−{volumePriceInfo.percentage}%</span>
+                    </div>
+                    <p className="volume-price-new is-discounted">{formatKzt(volumePriceInfo.finalKzt / cartItem!.quantity)} / мл</p>
+                  </>
+                ) : (
+                  <p className="price">{formatPricePerUnit(priceUsd, "ml", kztRate)}</p>
+                )}
+              </div>
+            ) : (
+              <p className="price">{priceDisplay}</p>
+            )}
             {isMl && isAvailable && (
               <div className="product-card-volumes" onClick={stop}>
                 {[50, 250, 500, 1000].map((v) => {

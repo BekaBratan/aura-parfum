@@ -875,6 +875,49 @@ img {
   border-color: var(--color-border);
 }
 
+.volume-price-info {
+  margin-top: 10px;
+}
+
+.volume-price-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.volume-price-old {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
+.discount-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: var(--color-danger);
+  border-radius: 5px;
+  line-height: 1.5;
+}
+
+.volume-price-new {
+  margin: 1px 0 0;
+  color: var(--color-accent-dark);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.volume-price-new.is-discounted {
+  color: var(--color-success);
+}
+
 /* Unified quantity controls (input + ‑ / +) */
 .qty-controls {
   display: inline-flex;

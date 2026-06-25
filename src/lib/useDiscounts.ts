@@ -4,31 +4,60 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Discount } from "@/types";
 
-/**
- * Fetch active, in-window discount rules. RLS also enforces the same window
- * on the public-read policy, but we filter once more on the client to handle
- * clock skew + cache freshness.
- */
+type Listener = () => void;
+
+let cached: Discount[] | null = null;
+let fetchPromise: Promise<void> | null = null;
+let intervalId: ReturnType<typeof setInterval> | null = null;
+const subs = new Set<Listener>();
+
+function notify() {
+  for (const fn of subs) fn();
+}
+
+async function load() {
+  if (fetchPromise) return fetchPromise;
+  fetchPromise = (async () => {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("discounts")
+      .select("*")
+      .eq("is_active", true)
+      .order("priority", { ascending: false });
+    if (!error) cached = (data as Discount[]) ?? [];
+    notify();
+  })();
+  return fetchPromise;
+}
+
+function startInterval() {
+  if (intervalId) return;
+  intervalId = setInterval(() => {
+    notify();
+  }, 60_000);
+}
+
+function stopInterval() {
+  if (subs.size === 0 && intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+  }
+}
+
 export function useActiveDiscounts(): Discount[] {
-  const [discounts, setDiscounts] = useState<Discount[]>([]);
-  const [, setTick] = useState(0);
+  const [discounts, setDiscounts] = useState<Discount[]>(cached ?? []);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("discounts")
-        .select("*")
-        .eq("is_active", true)
-        .order("priority", { ascending: false });
-      if (cancelled || error) return;
-      setDiscounts((data as Discount[]) ?? []);
-    })();
-    // Re-evaluate the date window every minute so a discount that expires
-    // during the customer's session disappears automatically.
-    const id = setInterval(() => setTick((t) => t + 1), 60_000);
-    return () => { cancelled = true; clearInterval(id); };
+    const fn: Listener = () => {
+      setDiscounts(cached ? [...cached] : []);
+    };
+    subs.add(fn);
+    load();
+    startInterval();
+    return () => {
+      subs.delete(fn);
+      stopInterval();
+    };
   }, []);
 
   return useMemo(() => {
