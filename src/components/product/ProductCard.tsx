@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Check, ShoppingBag, Trash2 } from "lucide-react";
 import { formatPriceUsd, formatPricePerUnit, getProductPrice, isKztPriced, itemPriceKzt } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
@@ -25,9 +26,11 @@ function notifyLimit(productName: string) {
 export default function ProductCard({
   product,
   variant = "grid",
+  interactive = true,
 }: {
   product: Product;
   variant?: ProductCardVariant;
+  interactive?: boolean;
 }) {
   const addItem = useCartStore((s) => s.addItem);
   const cartItems = useCartStore((s) => s.items);
@@ -275,204 +278,222 @@ export default function ProductCard({
     );
   };
 
-  return (
-    <div
-      className={`product-card-link product-card-link--${variant}`}
-    >
-      <article className={cardClassName}>
-        <div
-          className={
-            isList
-              ? "product-list-media product-card-media product-card-image"
-              : "product-card-media product-card-image"
-          }
-        >
-          {product.image_url && !imageError ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={product.image_thumb_url ?? product.image_url ?? ""}
-              alt={product.name}
-              loading="lazy"
-              decoding="async"
-              className="product-card-img"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <div className="image-placeholder">
-              <div>
-                <ShoppingBag size={42} strokeWidth={1.2} />
-                <span>AZ-ZAHRA</span>
-              </div>
-            </div>
-          )}
-
-          <div className="product-card-badges">
-            {product.is_featured && <span className="badge">Хит</span>}
-            {!isList && product.category !== "accessory" && product.attributes?.quality === "De Luxe" && (
-              <span className="badge badge-deluxe">De Luxe</span>
-            )}
-            {!isList && product.category !== "accessory" && product.attributes?.quality === "Premium" && (
-              <span className="badge badge-premium">Premium</span>
-            )}
-            {!isList && product.category === "accessory" && product.attributes?.type && (
-              <span className="badge badge-muted">{String(product.attributes.type)}</span>
-            )}
-          </div>
-
-          {countryCode && !isList && (
-            <div className="product-card-country" title={product.country_of_origin ?? ""}>
-              {countryCode}
-            </div>
-          )}
-
-          {isInCart && (
-            <div className="product-card-incart-pill" aria-label="В корзине">
-              <Check size={14} />
-            </div>
-          )}
-        </div>
-
-        {isList ? (
-          <>
-            <div className="product-list-content">
-              <div className="product-list-main">
-                <div className="product-list-brand-row">
-                  {product.category !== "accessory" && <p className="product-brand">{product.brand}</p>}
-                  <div className="product-list-inline-badges">
-                    {product.category !== "accessory" && product.attributes?.quality === "De Luxe" && (
-                      <span className="badge badge-deluxe">De Luxe</span>
-                    )}
-                    {product.category !== "accessory" && product.attributes?.quality === "Premium" && (
-                      <span className="badge badge-premium">Premium</span>
-                    )}
-                    {product.category === "accessory" && product.attributes?.type && (
-                      <span className="badge badge-muted">{String(product.attributes.type)}</span>
-                    )}
-                    {countryCode && (
-                      <span className="badge-country-round" title={product.country_of_origin ?? ""}>{countryCode}</span>
-                    )}
-                  </div>
-                </div>
-                <h3 className="product-title">{product.name}</h3>
-                {categoryLabel && (
-                  <p className="product-category-label">{categoryLabel}</p>
-                )}
-                {isAvailable && (
-                  <>
-                    {isMl && presets.length > 0 && (
-                      <div className="product-card-volumes" onClick={stop}>
-                        {presets.map((v) => {
-                          const isTaken = v > productCount;
-                          const isSelected = isInCart && cartItem.quantity === v;
-                          return (
-                            <button
-                              key={v}
-                              type="button"
-                              disabled={isTaken}
-                              onClick={(e) => handleVolumeClick(e, v)}
-                              className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
-                            >
-                              {v} мл
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                    {product.category === "accessory" && presets.length > 0 && (
-                      <div className="product-card-volumes" onClick={stop}>
-                        {presets.map((v) => {
-                          const isTaken = v > productCount;
-                          const isSelected = isInCart && cartItem.quantity === v;
-                          return (
-                            <button
-                              key={v}
-                              type="button"
-                              disabled={isTaken}
-                              onClick={(e) => handleQtyClick(e, v)}
-                              className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
-                            >
-                              {v} шт
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              <div className="product-list-meta">
-                <span className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
-                  {availabilityText}
-                </span>
-              </div>
-            </div>
-
-            <div className="product-list-actions">
-              <div>
-                {renderVolumePriceInfo()}
-              </div>
-              {renderCartControls()}
-            </div>
-          </>
+  const cardContent = (
+    <article className={cardClassName}>
+      <div
+        className={
+          isList
+            ? "product-list-media product-card-media product-card-image"
+            : "product-card-media product-card-image"
+        }
+      >
+        {product.image_url && !imageError ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={product.image_thumb_url ?? product.image_url ?? ""}
+            alt={product.name}
+            loading="lazy"
+            decoding="async"
+            className="product-card-img"
+            onError={() => setImageError(true)}
+          />
         ) : (
-          <div className="product-card-body">
-            {product.category !== "accessory" && <p className="product-brand">{product.brand}</p>}
-            <h3 className="product-title">{product.name}</h3>
-            {categoryLabel && (
-              <p className="product-category-label">{categoryLabel}</p>
-            )}
-            <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
-              {availabilityText}
-            </p>
-            {renderVolumePriceInfo()}
-            {isAvailable && (
-              <>
-{isMl && presets.length > 0 && (
-                    <div className="product-card-volumes" onClick={stop}>
-                    {presets.map((v) => {
-                      const isTaken = v > productCount;
-                      const isSelected = isInCart && cartItem.quantity === v;
-                      return (
-                        <button
-                          key={v}
-                          type="button"
-                          disabled={isTaken}
-                          onClick={(e) => handleVolumeClick(e, v)}
-                          className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
-                        >
-                          {v} мл
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-{product.category === "accessory" && presets.length > 0 && (
-                    <div className="product-card-volumes" onClick={stop}>
-                    {presets.map((v) => {
-                      const isTaken = v > productCount;
-                      const isSelected = isInCart && cartItem.quantity === v;
-                      return (
-                        <button
-                          key={v}
-                          type="button"
-                          disabled={isTaken}
-                          onClick={(e) => handleQtyClick(e, v)}
-                          className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
-                        >
-                          {v} шт
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-            <div className="product-card-cart-row">
-              {renderCartControls()}
+          <div className="image-placeholder">
+            <div>
+              <ShoppingBag size={42} strokeWidth={1.2} />
+              <span>AZ-ZAHRA</span>
             </div>
           </div>
         )}
-      </article>
+
+        <div className="product-card-badges">
+          {product.is_featured && <span className="badge">Хит</span>}
+          {!isList && product.category !== "accessory" && product.attributes?.quality === "De Luxe" && (
+            <span className="badge badge-deluxe">De Luxe</span>
+          )}
+          {!isList && product.category !== "accessory" && product.attributes?.quality === "Premium" && (
+            <span className="badge badge-premium">Premium</span>
+          )}
+          {!isList && product.category === "accessory" && product.attributes?.type && (
+            <span className="badge badge-muted">{String(product.attributes.type)}</span>
+          )}
+        </div>
+
+        {countryCode && !isList && (
+          <div className="product-card-country" title={product.country_of_origin ?? ""}>
+            {countryCode}
+          </div>
+        )}
+
+        {isInCart && interactive && (
+          <div className="product-card-incart-pill" aria-label="В корзине">
+            <Check size={14} />
+          </div>
+        )}
+      </div>
+
+      {isList ? (
+        <>
+          <div className="product-list-content">
+            <div className="product-list-main">
+              <div className="product-list-brand-row">
+                {product.category !== "accessory" && <p className="product-brand">{product.brand}</p>}
+                <div className="product-list-inline-badges">
+                  {product.category !== "accessory" && product.attributes?.quality === "De Luxe" && (
+                    <span className="badge badge-deluxe">De Luxe</span>
+                  )}
+                  {product.category !== "accessory" && product.attributes?.quality === "Premium" && (
+                    <span className="badge badge-premium">Premium</span>
+                  )}
+                  {product.category === "accessory" && product.attributes?.type && (
+                    <span className="badge badge-muted">{String(product.attributes.type)}</span>
+                  )}
+                  {countryCode && (
+                    <span className="badge-country-round" title={product.country_of_origin ?? ""}>{countryCode}</span>
+                  )}
+                </div>
+              </div>
+              <h3 className="product-title">{product.name}</h3>
+              {categoryLabel && (
+                <p className="product-category-label">{categoryLabel}</p>
+              )}
+              {interactive && isAvailable && (
+                <>
+                  {isMl && presets.length > 0 && (
+                    <div className="product-card-volumes" onClick={stop}>
+                      {presets.map((v) => {
+                        const isTaken = v > productCount;
+                        const isSelected = isInCart && cartItem.quantity === v;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            disabled={isTaken}
+                            onClick={(e) => handleVolumeClick(e, v)}
+                            className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                          >
+                            {v} мл
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {product.category === "accessory" && presets.length > 0 && (
+                    <div className="product-card-volumes" onClick={stop}>
+                      {presets.map((v) => {
+                        const isTaken = v > productCount;
+                        const isSelected = isInCart && cartItem.quantity === v;
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            disabled={isTaken}
+                            onClick={(e) => handleQtyClick(e, v)}
+                            className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                          >
+                            {v} шт
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="product-list-meta">
+              <span className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
+                {availabilityText}
+              </span>
+            </div>
+          </div>
+
+          <div className="product-list-actions">
+            <div>
+              {renderVolumePriceInfo()}
+            </div>
+            {interactive && renderCartControls()}
+          </div>
+        </>
+      ) : (
+        <div className="product-card-body">
+          {product.category !== "accessory" && <p className="product-brand">{product.brand}</p>}
+          <h3 className="product-title">{product.name}</h3>
+          {categoryLabel && (
+            <p className="product-category-label">{categoryLabel}</p>
+          )}
+          <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
+            {availabilityText}
+          </p>
+          {renderVolumePriceInfo()}
+          {interactive && isAvailable && (
+            <>
+{isMl && presets.length > 0 && (
+                  <div className="product-card-volumes" onClick={stop}>
+                  {presets.map((v) => {
+                    const isTaken = v > productCount;
+                    const isSelected = isInCart && cartItem.quantity === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        disabled={isTaken}
+                        onClick={(e) => handleVolumeClick(e, v)}
+                        className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                      >
+                        {v} мл
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+{product.category === "accessory" && presets.length > 0 && (
+                  <div className="product-card-volumes" onClick={stop}>
+                  {presets.map((v) => {
+                    const isTaken = v > productCount;
+                    const isSelected = isInCart && cartItem.quantity === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        disabled={isTaken}
+                        onClick={(e) => handleQtyClick(e, v)}
+                        className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                      >
+                        {v} шт
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+          {interactive && (
+            <div className="product-card-cart-row">
+              {renderCartControls()}
+            </div>
+          )}
+        </div>
+      )}
+    </article>
+  );
+
+  const catParam = product.category ?? "oil";
+  const qParam = encodeURIComponent(product.name);
+
+  if (!interactive) {
+    return (
+      <Link
+        href={`/catalog?category=${catParam}&q=${qParam}`}
+        className={`product-card-link product-card-link--${variant}`}
+      >
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return (
+    <div className={`product-card-link product-card-link--${variant}`}>
+      {cardContent}
     </div>
   );
 }

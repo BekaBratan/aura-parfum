@@ -127,7 +127,7 @@ export default async function HomePage() {
 
             <div className="product-grid">
               {featured.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} interactive={false} />
               ))}
             </div>
           </div>
@@ -149,7 +149,7 @@ export default async function HomePage() {
 
             <div className="product-grid">
               {newest.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} interactive={false} />
               ))}
             </div>
           </div>

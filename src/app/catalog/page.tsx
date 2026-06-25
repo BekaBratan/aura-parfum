@@ -84,6 +84,7 @@ function CatalogContent() {
   const pathname = usePathname();
 
   const rawCategory = searchParams.get("category");
+  const rawSearch = searchParams.get("q") ?? "";
   const activeCategory: ProductCategory = isValidCategory(rawCategory)
     ? rawCategory
     : DEFAULT_CATEGORY;
@@ -135,14 +136,15 @@ function CatalogContent() {
     load();
   }, []);
 
-  // Sync category filter when URL param changes
+  // Sync category + search from URL params
   useEffect(() => {
     setFilters((prev) => ({
       ...DEFAULT_FILTERS,
       sortBy: prev.sortBy,
       category: activeCategory,
+      search: rawSearch,
     }));
-  }, [activeCategory]);
+  }, [activeCategory, rawSearch]);
 
   // If URL has no category (or an unknown one), normalize to the default
   useEffect(() => {
