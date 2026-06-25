@@ -46,9 +46,9 @@ export default function ProductCard({
   const priceUsd = getProductPrice(product);
 
   const volumePriceInfo = useMemo(() => {
-    if (!isMl || !isInCart || !cartItem) return null;
+    if (!isInCart || !cartItem) return null;
 
-    const volume = cartItem.quantity;
+    const qty = cartItem.quantity;
     const category = product.category ?? "oil";
     const unitPrice = priceUsd;
 
@@ -59,12 +59,12 @@ export default function ProductCard({
       name: product.name,
       brand: product.brand,
       price_usd: unitPrice,
-      volume_ml: volume,
+      volume_ml: isMl ? qty : null,
       image_url: product.image_url,
       image_thumb_url: product.image_thumb_url ?? null,
       unit: product.unit ?? "ml",
       category,
-      quantity: volume,
+      quantity: qty,
       count: productCount,
       attributes: product.attributes ?? null,
       gender: product.gender ?? null,
@@ -85,9 +85,9 @@ export default function ProductCard({
       };
     }
 
-    const base = itemPriceKzt(unitPrice, category, kztRate) * volume;
+    const base = itemPriceKzt(unitPrice, category, kztRate) * qty;
     return { baseKzt: base, finalKzt: base, discountKzt: 0, percentage: 0, hasDiscount: false as const };
-  }, [isMl, isInCart, cartItem, priceUsd, product.id, product.name, product.brand, product.image_url, product.image_thumb_url, product.unit, product.category, product.attributes, product.gender, product.country_of_origin, product.code, productCount, activeDiscounts, kztRate]);
+  }, [isInCart, cartItem, priceUsd, product.id, product.name, product.brand, product.image_url, product.image_thumb_url, product.unit, product.category, product.attributes, product.gender, product.country_of_origin, product.code, productCount, activeDiscounts, kztRate, isMl]);
 
   const cardClassName = [
     "product-card",
@@ -154,6 +154,30 @@ export default function ProductCard({
     toast.success(`${product.name} (${volume} мл) добавлен в корзину`);
   };
 
+  const handleQtyClick = (e: React.MouseEvent, qty: number) => {
+    stop(e);
+    if (!isAvailable) return;
+    const safeQty = Math.min(qty, productCount);
+    addItem({
+      product_id: product.id,
+      name: product.name,
+      brand: product.brand,
+      price_usd: priceUsd,
+      volume_ml: null,
+      image_url: product.image_url,
+      image_thumb_url: product.image_thumb_url ?? null,
+      count: productCount,
+      unit: product.unit ?? "pcs",
+      category: product.category ?? "accessory",
+      quantity: safeQty,
+      attributes: product.attributes ?? null,
+      gender: product.gender ?? null,
+      country_of_origin: product.country_of_origin ?? null,
+      code: product.code ?? null,
+    });
+    toast.success(`${product.name} (${safeQty} шт) добавлен в корзину`);
+  };
+
   const priceDisplay = isMl
     ? formatPricePerUnit(priceUsd, "ml", kztRate)
     : isKztPriced(product.category)
@@ -169,6 +193,33 @@ export default function ProductCard({
     : null;
 
   const availabilityText = isAvailable ? "В наличии" : "Нет в наличии";
+
+  const renderVolumePriceInfo = () => {
+    if (!volumePriceInfo) return <p className="price">{priceDisplay}</p>;
+
+    const oldDisplay = isMl
+      ? formatPricePerUnit(priceUsd, "ml", kztRate)
+      : isKztPriced(product.category)
+        ? formatKzt(priceUsd)
+        : formatPriceUsd(priceUsd, kztRate);
+
+    if (!volumePriceInfo.hasDiscount) return <p className="price">{oldDisplay}</p>;
+
+    const perUnit = volumePriceInfo.finalKzt / cartItem!.quantity;
+    const newDisplay = isMl
+      ? `${formatKzt(perUnit)} / мл`
+      : formatKzt(perUnit);
+
+    return (
+      <div className="volume-price-info">
+        <div className="volume-price-row">
+          <span className="volume-price-old">{oldDisplay}</span>
+          <span className="discount-badge">−{volumePriceInfo.percentage}%</span>
+        </div>
+        <p className="volume-price-new is-discounted">{newDisplay}</p>
+      </div>
+    );
+  };
 
   const renderCartControls = () => {
     if (!isAvailable) {
@@ -303,7 +354,77 @@ export default function ProductCard({
                 {categoryLabel && (
                   <p className="product-category-label">{categoryLabel}</p>
                 )}
-                {isMl && isAvailable && (
+                {isAvailable && (
+                  <>
+                    {isMl && (
+                      <div className="product-card-volumes" onClick={stop}>
+                        {[50, 250, 500, 1000].map((v) => {
+                          const isTaken = v > productCount;
+                          const isSelected = isInCart && cartItem.quantity === v;
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              disabled={isTaken}
+                              onClick={(e) => handleVolumeClick(e, v)}
+                              className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                            >
+                              {v} мл
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {product.category === "accessory" && (
+                      <div className="product-card-volumes" onClick={stop}>
+                        {[50, 100, 250, 500].map((v) => {
+                          const isTaken = v > productCount;
+                          const isSelected = isInCart && cartItem.quantity === v;
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              disabled={isTaken}
+                              onClick={(e) => handleQtyClick(e, v)}
+                              className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                            >
+                              {v} шт
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="product-list-meta">
+                <span className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
+                  {availabilityText}
+                </span>
+              </div>
+            </div>
+
+            <div className="product-list-actions">
+              <div>
+                {renderVolumePriceInfo()}
+              </div>
+              {renderCartControls()}
+            </div>
+          </>
+        ) : (
+          <div className="product-card-body">
+            {product.category !== "accessory" && <p className="product-brand">{product.brand}</p>}
+            <h3 className="product-title">{product.name}</h3>
+            {categoryLabel && (
+              <p className="product-category-label">{categoryLabel}</p>
+            )}
+            <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
+              {availabilityText}
+            </p>
+            {renderVolumePriceInfo()}
+            {isAvailable && (
+              <>
+                {isMl && (
                   <div className="product-card-volumes" onClick={stop}>
                     {[50, 250, 500, 1000].map((v) => {
                       const isTaken = v > productCount;
@@ -322,82 +443,26 @@ export default function ProductCard({
                     })}
                   </div>
                 )}
-              </div>
-              <div className="product-list-meta">
-                <span className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
-                  {availabilityText}
-                </span>
-              </div>
-            </div>
-
-            <div className="product-list-actions">
-              <div>
-                {volumePriceInfo ? (
-                  <div className="volume-price-info">
-                    {volumePriceInfo.hasDiscount ? (
-                      <>
-                        <div className="volume-price-row">
-                          <span className="volume-price-old">{formatPricePerUnit(priceUsd, "ml", kztRate)}</span>
-                          <span className="discount-badge">−{volumePriceInfo.percentage}%</span>
-                        </div>
-                        <p className="volume-price-new is-discounted">{formatKzt(volumePriceInfo.finalKzt / cartItem!.quantity)} / мл</p>
-                      </>
-                    ) : (
-                      <p className="price">{formatPricePerUnit(priceUsd, "ml", kztRate)}</p>
-                    )}
+                {product.category === "accessory" && (
+                  <div className="product-card-volumes" onClick={stop}>
+                    {[50, 100, 250, 500].map((v) => {
+                      const isTaken = v > productCount;
+                      const isSelected = isInCart && cartItem.quantity === v;
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          disabled={isTaken}
+                          onClick={(e) => handleQtyClick(e, v)}
+                          className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                        >
+                          {v} шт
+                        </button>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <p className="price">{priceDisplay}</p>
                 )}
-              </div>
-              {renderCartControls()}
-            </div>
-          </>
-        ) : (
-          <div className="product-card-body">
-            {product.category !== "accessory" && <p className="product-brand">{product.brand}</p>}
-            <h3 className="product-title">{product.name}</h3>
-            {categoryLabel && (
-              <p className="product-category-label">{categoryLabel}</p>
-            )}
-            <p className={`product-availability ${isAvailable ? "" : "is-empty"}`}>
-              {availabilityText}
-            </p>
-            {volumePriceInfo ? (
-              <div className="volume-price-info">
-                {volumePriceInfo.hasDiscount ? (
-                  <>
-                    <div className="volume-price-row">
-                      <span className="volume-price-old">{formatPricePerUnit(priceUsd, "ml", kztRate)}</span>
-                      <span className="discount-badge">−{volumePriceInfo.percentage}%</span>
-                    </div>
-                    <p className="volume-price-new is-discounted">{formatKzt(volumePriceInfo.finalKzt / cartItem!.quantity)} / мл</p>
-                  </>
-                ) : (
-                  <p className="price">{formatPricePerUnit(priceUsd, "ml", kztRate)}</p>
-                )}
-              </div>
-            ) : (
-              <p className="price">{priceDisplay}</p>
-            )}
-            {isMl && isAvailable && (
-              <div className="product-card-volumes" onClick={stop}>
-                {[50, 250, 500, 1000].map((v) => {
-                  const isTaken = v > productCount;
-                  const isSelected = isInCart && cartItem.quantity === v;
-                  return (
-                    <button
-                      key={v}
-                      type="button"
-                      disabled={isTaken}
-                      onClick={(e) => handleVolumeClick(e, v)}
-                      className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
-                    >
-                      {v} мл
-                    </button>
-                  );
-                })}
-              </div>
+              </>
             )}
             <div className="product-card-cart-row">
               {renderCartControls()}
