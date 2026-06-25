@@ -11,6 +11,7 @@ import { Product, CartItem } from "@/types";
 import toast from "react-hot-toast";
 import { useEffect, useMemo, useState } from "react";
 import { useCountryStore, getCountryCode } from "@/store/countryStore";
+import { usePresets, getPresetType } from "@/lib/usePresets";
 import QuantityControls from "@/components/ui/QuantityControls";
 
 type ProductCardVariant = "grid" | "list";
@@ -44,6 +45,8 @@ export default function ProductCard({
   const isMl = product.unit === "ml";
   const minVolume = product.min_volume ?? 1;
   const priceUsd = getProductPrice(product);
+  const presetType = getPresetType(product.category, product.unit);
+  const presets = usePresets(presetType ?? "");
 
   const volumePriceInfo = useMemo(() => {
     if (!isInCart || !cartItem) return null;
@@ -356,9 +359,9 @@ export default function ProductCard({
                 )}
                 {isAvailable && (
                   <>
-                    {isMl && (
+                    {isMl && presets.length > 0 && (
                       <div className="product-card-volumes" onClick={stop}>
-                        {[50, 250, 500, 1000].map((v) => {
+                        {presets.map((v) => {
                           const isTaken = v > productCount;
                           const isSelected = isInCart && cartItem.quantity === v;
                           return (
@@ -375,9 +378,9 @@ export default function ProductCard({
                         })}
                       </div>
                     )}
-                    {product.category === "accessory" && (
+                    {product.category === "accessory" && presets.length > 0 && (
                       <div className="product-card-volumes" onClick={stop}>
-                        {[50, 100, 250, 500].map((v) => {
+                        {presets.map((v) => {
                           const isTaken = v > productCount;
                           const isSelected = isInCart && cartItem.quantity === v;
                           return (
@@ -424,9 +427,9 @@ export default function ProductCard({
             {renderVolumePriceInfo()}
             {isAvailable && (
               <>
-                {isMl && (
-                  <div className="product-card-volumes" onClick={stop}>
-                    {[50, 250, 500, 1000].map((v) => {
+{isMl && presets.length > 0 && (
+                    <div className="product-card-volumes" onClick={stop}>
+                    {presets.map((v) => {
                       const isTaken = v > productCount;
                       const isSelected = isInCart && cartItem.quantity === v;
                       return (
@@ -443,9 +446,9 @@ export default function ProductCard({
                     })}
                   </div>
                 )}
-                {product.category === "accessory" && (
-                  <div className="product-card-volumes" onClick={stop}>
-                    {[50, 100, 250, 500].map((v) => {
+{product.category === "accessory" && presets.length > 0 && (
+                    <div className="product-card-volumes" onClick={stop}>
+                    {presets.map((v) => {
                       const isTaken = v > productCount;
                       const isSelected = isInCart && cartItem.quantity === v;
                       return (

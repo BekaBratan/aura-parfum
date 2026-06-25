@@ -87,8 +87,16 @@ export async function DELETE(request: Request) {
   const admin = await requireAdmin();
   if (!admin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const { id } = await request.json();
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const body = await request.json();
+  const { id, type } = body;
+
+  if (type) {
+    const { error } = await admin.from("product_options").delete().eq("type", type);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true, deletedType: type });
+  }
+
+  if (!id) return NextResponse.json({ error: "Missing id or type" }, { status: 400 });
 
   const { error } = await admin.from("product_options").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
