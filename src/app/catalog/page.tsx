@@ -146,19 +146,17 @@ function CatalogContent() {
     }));
   }, [activeCategory, rawSearch]);
 
-  // If URL has no category (or an unknown one), normalize to the default
-  useEffect(() => {
-    if (!isValidCategory(rawCategory)) {
+  const createQueryString = useCallback(
+    (name: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      params.set("category", DEFAULT_CATEGORY);
-      router.replace(`${pathname}?${params.toString()}`);
-    }
-  }, [rawCategory, searchParams, router, pathname]);
+      params.set(name, value);
+      return params.toString();
+    },
+    [searchParams],
+  );
 
   const handleCategoryChange = (cat: ProductCategory) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("category", cat);
-    router.push(`${pathname}?${params.toString()}`);
+    router.push(`${pathname}?${createQueryString("category", cat)}`);
   };
 
   const handleViewModeChange = (mode: CatalogViewMode) => {
