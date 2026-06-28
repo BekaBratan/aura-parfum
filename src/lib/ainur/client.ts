@@ -59,6 +59,7 @@ export interface ListProductsOptions {
   ids?: string[];
   minPrice?: number;
   maxPrice?: number;
+  _revalidate?: number;
 }
 
 export async function listAinurProducts(options: ListProductsOptions = {}): Promise<AinurProduct[]> {
@@ -69,7 +70,7 @@ export async function listAinurProducts(options: ListProductsOptions = {}): Prom
     "ids": options.ids,
     min_price: options.minPrice,
     max_price: options.maxPrice,
-  });
+  }, options._revalidate);
 }
 
 export async function getAinurProduct(id: string): Promise<AinurProduct> {

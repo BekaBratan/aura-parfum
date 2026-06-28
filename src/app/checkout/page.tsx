@@ -15,6 +15,7 @@ import { useCurrencyStore } from "@/store/currencyStore";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
 import { CartItem, Product } from "@/types";
 import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
+import { validateAinurStock } from "@/lib/actions/validateAinurStock";
 
 type StockIssue = {
   item: CartItem;
@@ -220,6 +221,24 @@ export default function CheckoutPage() {
 
       if (currentStockIssue) {
         toast.error(getStockIssueMessage(currentStockIssue));
+        setSubmitting(false);
+        return;
+      }
+
+      // JIT stock validation: live-check against AinurPOS API before committing the order.
+      const jitItems = currentItems.map((item) => ({
+        product_id: item.product_id,
+        name: item.name,
+        quantity: Number(item.quantity),
+        ainur_id: item.ainur_id ?? null,
+      }));
+      const jitResult = await validateAinurStock(jitItems);
+
+      if (!jitResult.valid) {
+        toast.error(
+          `Недостаточно товара: ${jitResult.itemName}. Запрошено: ${jitResult.requested}, доступно: ${jitResult.available}.`,
+        );
+        await refreshCartProducts();
         setSubmitting(false);
         return;
       }

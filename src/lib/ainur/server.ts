@@ -14,8 +14,8 @@ import { normalizeProductName, type StockMap } from "./stockOverlay";
  * On name collisions we keep the larger count — better to over-report than
  * to hide stock from the catalog.
  */
-export async function buildAinurStockMap(storeId: string = DEFAULT_STORE_ID): Promise<StockMap> {
-  const products = await listAinurProducts({ storeId, limit: 1000 });
+export async function buildAinurStockMap(storeId: string = DEFAULT_STORE_ID, fresh?: boolean): Promise<StockMap> {
+  const products = await listAinurProducts({ storeId, limit: 1000, _revalidate: fresh ? 0 : undefined });
   const byId: Record<string, number> = {};
   const byName: Record<string, number> = {};
 
