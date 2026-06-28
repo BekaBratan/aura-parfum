@@ -116,6 +116,10 @@ export default function ProductCard({
   const handleAdd = (e: React.MouseEvent) => {
     stop(e);
     if (!isAvailable) return;
+    if (isMl && productCount < minVolume) {
+      toast.error(`Недостаточно запаса для мин. объёма ${minVolume} мл: ${product.name}`);
+      return;
+    }
     const qty = isMl ? Math.min(minVolume, productCount) : 1;
     addItem({
       product_id: product.id,
@@ -133,6 +137,7 @@ export default function ProductCard({
       gender: product.gender ?? null,
       country_of_origin: product.country_of_origin ?? null,
       code: product.code ?? null,
+      min_volume: isMl ? minVolume : null,
     });
     toast.success(`${product.name} добавлен в корзину`);
   };
@@ -140,6 +145,10 @@ export default function ProductCard({
   const handleVolumeClick = (e: React.MouseEvent, volume: number) => {
     stop(e);
     if (!isAvailable) return;
+    if (isMl && volume < minVolume) {
+      toast.error(`Минимальный объём — ${minVolume} мл`);
+      return;
+    }
     addItem({
       product_id: product.id,
       name: product.name,
@@ -156,6 +165,7 @@ export default function ProductCard({
       gender: product.gender ?? null,
       country_of_origin: product.country_of_origin ?? null,
       code: product.code ?? null,
+      min_volume: isMl ? minVolume : null,
     });
     toast.success(`${product.name} (${volume} мл) добавлен в корзину`);
   };
@@ -257,11 +267,10 @@ export default function ProductCard({
       <div className="card-cart-controls-wrap" onClick={stop}>
         <QuantityControls
           value={cartItem.quantity}
-          min={1}
+          min={isMl ? minVolume : 1}
           max={productCount}
           unit={product.unit ?? "pcs"}
           onChange={(v) => updateQuantity(product.id, v)}
-          onDecrementBelowMin={() => removeItem(product.id)}
           onLimitExceeded={() => notifyLimit(product.name)}
           size="sm"
           className="card-cart-controls"
@@ -362,15 +371,18 @@ export default function ProductCard({
                   {isMl && presets.length > 0 && (
                     <div className="product-card-volumes" onClick={stop}>
                       {presets.map((v) => {
+                        const isBelowMin = isMl && v < minVolume;
                         const isTaken = v > productCount;
+                        const isDisabled = isBelowMin || isTaken;
                         const isSelected = isInCart && cartItem.quantity === v;
                         return (
                           <button
                             key={v}
                             type="button"
-                            disabled={isTaken}
+                            disabled={isDisabled}
                             onClick={(e) => handleVolumeClick(e, v)}
-                            className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                            className={`volume-pill ${isSelected ? "is-selected" : ""} ${isDisabled ? "is-disabled" : ""}`}
+                            title={isBelowMin ? `Мин. объём ${minVolume} мл` : ""}
                           >
                             {v} мл
                           </button>
@@ -430,15 +442,18 @@ export default function ProductCard({
 {isMl && presets.length > 0 && (
                   <div className="product-card-volumes" onClick={stop}>
                   {presets.map((v) => {
+                    const isBelowMin = isMl && v < minVolume;
                     const isTaken = v > productCount;
+                    const isDisabled = isBelowMin || isTaken;
                     const isSelected = isInCart && cartItem.quantity === v;
                     return (
                       <button
                         key={v}
                         type="button"
-                        disabled={isTaken}
+                        disabled={isDisabled}
                         onClick={(e) => handleVolumeClick(e, v)}
-                        className={`volume-pill ${isSelected ? "is-selected" : ""} ${isTaken ? "is-disabled" : ""}`}
+                        className={`volume-pill ${isSelected ? "is-selected" : ""} ${isDisabled ? "is-disabled" : ""}`}
+                        title={isBelowMin ? `Мин. объём ${minVolume} мл` : ""}
                       >
                         {v} мл
                       </button>

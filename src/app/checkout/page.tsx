@@ -19,15 +19,23 @@ import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay"
 type StockIssue = {
   item: CartItem;
   availableCount: number;
+  reason: "out_of_stock" | "over_limit" | "below_min";
 };
 
 function getFirstStockIssue(items: CartItem[]): StockIssue | null {
   for (const item of items) {
     const quantity = Number(item.quantity);
     const availableCount = Number(item.count ?? 0);
+    const lowerBound = item.min_volume ?? 1;
 
-    if (Number.isNaN(quantity) || quantity <= 0 || availableCount <= 0 || quantity > availableCount) {
-      return { item, availableCount };
+    if (Number.isNaN(quantity) || quantity <= 0 || availableCount <= 0) {
+      return { item, availableCount, reason: "out_of_stock" };
+    }
+    if (quantity > availableCount) {
+      return { item, availableCount, reason: "over_limit" };
+    }
+    if (item.unit === "ml" && quantity < lowerBound) {
+      return { item, availableCount, reason: "below_min" };
     }
   }
 
@@ -35,10 +43,12 @@ function getFirstStockIssue(items: CartItem[]): StockIssue | null {
 }
 
 function getStockIssueMessage(issue: StockIssue) {
-  if (issue.availableCount <= 0) {
+  if (issue.reason === "out_of_stock") {
     return `Товар закончился: ${issue.item.name}. Удалите его из корзины.`;
   }
-
+  if (issue.reason === "below_min") {
+    return `Минимальный объём заказа — ${issue.item.min_volume ?? 1} мл: ${issue.item.name}. Увеличьте количество в корзине.`;
+  }
   return `Превышен лимит запаса: ${issue.item.name}. Уменьшите количество в корзине.`;
 }
 
@@ -78,7 +88,7 @@ export default function CheckoutPage() {
       const [{ data, error }, stockMap] = await Promise.all([
         supabase
           .from("products")
-          .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category, attributes, gender, country_of_origin, code, ainur_id")
+          .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category, attributes, gender, country_of_origin, code, ainur_id, min_volume")
           .in("id", productIds),
         fetchAinurStockMap().catch(() => null),
       ]);
@@ -107,6 +117,7 @@ export default function CheckoutPage() {
         country_of_origin: p.country_of_origin ?? null,
         code: p.code ?? null,
         ainur_id: p.ainur_id ?? null,
+        min_volume: p.min_volume ?? null,
       }));
 
       syncItemsWithProducts(snapshots);

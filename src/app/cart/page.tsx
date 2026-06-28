@@ -35,6 +35,7 @@ function getCartStockWarnings(items: CartItem[]): CartStockWarning[] {
   return items.flatMap((item) => {
     const availableCount = Number(item.count ?? 0);
     const quantity = Number(item.quantity);
+    const lowerBound = item.min_volume ?? 1;
 
     if (availableCount <= 0) {
       return [{ productId: item.product_id, message: `Товар закончился: ${item.name}` }];
@@ -45,6 +46,15 @@ function getCartStockWarnings(items: CartItem[]): CartStockWarning[] {
         {
           productId: item.product_id,
           message: `Превышен лимит запаса: ${item.name}. Уменьшите количество в корзине.`,
+        },
+      ];
+    }
+
+    if (availableCount < lowerBound) {
+      return [
+        {
+          productId: item.product_id,
+          message: `Недостаточно запаса для минимального объёма ${lowerBound} мл: ${item.name}`,
         },
       ];
     }
@@ -103,7 +113,7 @@ export default function CartPage() {
       const [{ data, error }, stockMap] = await Promise.all([
         supabase
           .from("products")
-          .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category, attributes, gender, country_of_origin, code, ainur_id")
+          .select("id, name, brand, price_usd, volume_ml, image_url, image_thumb_url, count, unit, category, attributes, gender, country_of_origin, code, ainur_id, min_volume")
           .in("id", productIds),
         fetchAinurStockMap().catch(() => null),
       ]);
@@ -145,6 +155,7 @@ export default function CartPage() {
         country_of_origin: p.country_of_origin ?? null,
         code: p.code ?? null,
         ainur_id: p.ainur_id ?? null,
+        min_volume: p.min_volume ?? null,
       }));
 
       syncItemsWithProducts(snapshots);
@@ -315,11 +326,10 @@ export default function CartPage() {
                 <div className="cart-item-qty">
                   <QuantityControls
                     value={item.quantity}
-                    min={1}
+                    min={item.min_volume ?? 1}
                     max={availableCount || 1}
                     unit={item.unit ?? "pcs"}
                     onChange={(v) => updateQuantity(item.product_id, v)}
-                    onDecrementBelowMin={() => removeItem(item.product_id)}
                     onLimitExceeded={() =>
                       toast.error(`Превышен лимит запаса: ${item.name}`, { id: "stock-limit" })
                     }

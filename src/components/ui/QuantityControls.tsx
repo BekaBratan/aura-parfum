@@ -35,10 +35,7 @@ export default function QuantityControls({
 
   const handleDecrement = (e: React.MouseEvent) => {
     stop(e);
-    if (value <= min) {
-      onDecrementBelowMin?.();
-      return;
-    }
+    if (value <= min) return;
     onChange(Math.max(min, value - step));
   };
 
@@ -51,7 +48,7 @@ export default function QuantityControls({
     onChange(Math.min(max, value + step));
   };
 
-  const canDecrement = value > min || !!onDecrementBelowMin;
+  const canDecrement = value > min;
   const canIncrement = value < max;
 
   return (

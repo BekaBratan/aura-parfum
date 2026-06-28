@@ -121,6 +121,7 @@ export interface AppliedDiscountLine {
 export interface CartItem extends OrderItem {
   quantity: number;
   count: number;
+  min_volume?: number | null;
 }
 
 export interface FilterState {

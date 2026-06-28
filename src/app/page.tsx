@@ -37,7 +37,7 @@ async function getNewProducts(): Promise<Product[]> {
       .from("products")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(8);
+      .limit(12);
     return (data as Product[]) || [];
   } catch {
     return [];

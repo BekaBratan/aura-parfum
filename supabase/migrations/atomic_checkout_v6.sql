@@ -108,7 +108,8 @@ begin
       products.attributes,
       products.gender,
       products.country_of_origin,
-      products.code
+      products.code,
+      products.min_volume
     into v_product
     from public.products
     where products.id = v_item.product_id
@@ -126,6 +127,11 @@ begin
       v_unit_label := case when v_product.unit = 'ml' then 'мл' else 'шт.' end;
       raise exception 'Недостаточно товара: %. В корзине: % %, доступно: % %.',
         v_product.name, v_item.quantity, v_unit_label, v_product.count, v_unit_label;
+    end if;
+
+    if v_product.unit = 'ml' and coalesce(v_product.min_volume, 1) > v_item.quantity then
+      raise exception 'Минимальный объём заказа — % мл: %. Увеличьте количество в корзине.',
+        coalesce(v_product.min_volume, 1), v_product.name;
     end if;
 
     update public.products

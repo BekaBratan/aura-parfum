@@ -43,7 +43,7 @@ const emptyProduct: FormState = {
   price: "",
   category: "perfume",
   volume_ml: "",
-  min_volume: "",
+  min_volume: "50",
   image_url: "",
   image_thumb_url: "",
   count: "",
@@ -1162,7 +1162,7 @@ export default function AdminProducts() {
                 {isMl && (
                   <div className="form-group">
                     <label htmlFor="product-min-volume" className="form-label">Мин. объём, мл</label>
-                    <input id="product-min-volume" name="min_volume" type="text" inputMode="numeric" pattern="[0-9]*" value={form.min_volume} onChange={handleChange} placeholder="1" className="input-dark" />
+                    <input id="product-min-volume" name="min_volume" type="text" inputMode="numeric" pattern="[0-9]*" value={form.min_volume} onChange={handleChange} placeholder="50" className="input-dark" />
                     <p className="form-help">Минимальный заказ (по умолчанию 1 мл)</p>
                   </div>
                 )}

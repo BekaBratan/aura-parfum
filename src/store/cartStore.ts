@@ -19,6 +19,7 @@ export type CartProductSnapshot = {
   country_of_origin?: string | null;
   code?: string | null;
   ainur_id?: string | null;
+  min_volume?: number | null;
 };
 
 interface CartStore {
@@ -43,7 +44,9 @@ export const useCartStore = create<CartStore>()(
         if (availableCount <= 0) return;
 
         const initialQty = item.quantity ?? 1;
-        const safeQty = Math.min(Math.max(1, initialQty), availableCount);
+        const lowerBound = item.min_volume ?? 1;
+        const safeQty = Math.min(Math.max(lowerBound, initialQty), availableCount);
+        if (safeQty < lowerBound) return;
 
         const existing = get().items.find((i) => i.product_id === item.product_id);
 
@@ -71,11 +74,12 @@ export const useCartStore = create<CartStore>()(
           return;
         }
         set({
-          items: get().items.map((i) =>
-            i.product_id === productId
-              ? { ...i, quantity: Math.min(quantity, Number(i.count ?? 0)) }
-              : i
-          ),
+          items: get().items.map((i) => {
+            if (i.product_id !== productId) return i;
+            const lowerBound = i.min_volume ?? 1;
+            const clamped = Math.min(Math.max(lowerBound, quantity), Number(i.count ?? 0));
+            return { ...i, quantity: clamped };
+          }),
         });
       },
 
@@ -101,6 +105,7 @@ export const useCartStore = create<CartStore>()(
               country_of_origin: product.country_of_origin ?? item.country_of_origin ?? null,
               code: product.code ?? item.code ?? null,
               ainur_id: product.ainur_id ?? item.ainur_id ?? null,
+              min_volume: product.min_volume ?? item.min_volume ?? null,
             };
           }),
         });
