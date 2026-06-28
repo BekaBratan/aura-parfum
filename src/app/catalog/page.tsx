@@ -52,7 +52,7 @@ const DEFAULT_FILTERS: FilterState = {
   volumes: [],
   priceMin: null,
   priceMax: null,
-  inStockOnly: false,
+  inStockOnly: true,
   sortBy: "name_asc",
   category: null,
   attributeFilters: {},
@@ -101,9 +101,13 @@ function CatalogContent() {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<CatalogViewMode>("grid");
 
+  const rawShowOutOfStock = searchParams.get("showOutOfStock");
+  const initialInStockOnly = rawShowOutOfStock === "true" ? false : true;
+
   const [filters, setFilters] = useState<FilterState>({
     ...DEFAULT_FILTERS,
     category: activeCategory,
+    inStockOnly: initialInStockOnly,
   });
 
   // Persist view mode
@@ -141,6 +145,7 @@ function CatalogContent() {
     setFilters((prev) => ({
       ...DEFAULT_FILTERS,
       sortBy: prev.sortBy,
+      inStockOnly: prev.inStockOnly,
       category: activeCategory,
       search: rawSearch,
     }));
@@ -313,6 +318,13 @@ function CatalogContent() {
         list.sort((a, b) => a.name.localeCompare(b.name, "ru"));
     }
 
+    // Out-of-stock items always at the end
+    list.sort((a, b) => {
+      const aInStock = Number(a.count ?? 0) > 0 ? 0 : 1;
+      const bInStock = Number(b.count ?? 0) > 0 ? 0 : 1;
+      return aInStock - bInStock;
+    });
+
     return list;
   }, [products, activeCategory, filters]);
 
@@ -350,7 +362,10 @@ function CatalogContent() {
   }, []);
 
   const clearFilters = () => {
-    setFilters({ ...DEFAULT_FILTERS, category: activeCategory, sortBy: filters.sortBy });
+    setFilters({ ...DEFAULT_FILTERS, category: activeCategory, sortBy: filters.sortBy, inStockOnly: true });
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("showOutOfStock");
+    router.replace(`${pathname}?${params.toString()}`);
     setPage(1);
   };
 
@@ -359,8 +374,7 @@ function CatalogContent() {
     filters.countries.length > 0 ||
     Object.values(filters.attributeFilters).some((v) => v.length > 0) ||
     filters.priceMin !== null ||
-    filters.priceMax !== null ||
-    filters.inStockOnly;
+    filters.priceMax !== null;
 
   return (
     <div className="catalog-layout">
@@ -603,12 +617,19 @@ function CatalogContent() {
             <label className="checkbox-field">
               <input
                 type="checkbox"
-                checked={filters.inStockOnly}
-                onChange={(e) =>
-                  setFilters((prev) => ({ ...prev, inStockOnly: e.target.checked }))
-                }
+                checked={!filters.inStockOnly}
+                onChange={(e) => {
+                  setFilters((prev) => ({ ...prev, inStockOnly: !e.target.checked }));
+                  const params = new URLSearchParams(searchParams.toString());
+                  if (e.target.checked) {
+                    params.set("showOutOfStock", "true");
+                  } else {
+                    params.delete("showOutOfStock");
+                  }
+                  router.replace(`${pathname}?${params.toString()}`);
+                }}
               />
-              Только в наличии
+              Показать отсутствующие
             </label>
 
             {hasActiveFilters && (
