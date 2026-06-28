@@ -49,7 +49,7 @@ export default function ProductCard({
   const minVolume = product.min_volume ?? 1;
   const priceUsd = getProductPrice(product);
   const presetType = getPresetType(product.category, product.unit);
-  const presets = usePresets(presetType ?? "");
+  const { presets } = usePresets(presetType ?? "");
 
   const volumePriceInfo = useMemo(() => {
     if (!isInCart || !cartItem) return null;

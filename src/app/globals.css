@@ -40,9 +40,19 @@ html {
   scroll-behavior: smooth;
 }
 
+html.is-menu-open {
+  overflow: hidden;
+  height: 100%;
+}
+
+body.is-menu-open {
+  overflow: hidden;
+  height: 100%;
+}
+
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: "Manrope", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -101,14 +111,16 @@ img {
 }
 
 .site-shell {
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
   background:
     radial-gradient(circle at top left, rgba(184, 144, 79, 0.1), transparent 32rem),
     var(--color-bg);
 }
 
 .site-main {
-  min-height: 100vh;
+  flex: 1;
 }
 
 .site-container,
@@ -314,13 +326,14 @@ img {
   position: fixed;
   top: 0;
   right: 0;
-  bottom: 0;
+  height: 100dvh;
   z-index: 100;
   width: min(320px, 86vw);
   display: flex;
   flex-direction: column;
   gap: 18px;
   padding: 18px 18px 28px;
+  padding-bottom: max(28px, env(safe-area-inset-bottom, 28px));
   background: var(--color-bg);
   box-shadow: -18px 0 60px rgba(34, 28, 20, 0.18);
   transform: translateX(100%);
@@ -1351,7 +1364,7 @@ img {
 .modal-form {
   display: flex;
   flex-direction: column;
-  max-height: min(90vh, 760px);
+  max-height: min(calc(100dvh - 48px), 760px);
   overflow: hidden;
 }
 

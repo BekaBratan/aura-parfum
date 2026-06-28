@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["10.124.73.126"],
   images: {
     // Disable Vercel image optimization globally — we serve product images
     // straight from Supabase Storage (Free plan: raw object URLs; Pro: helper

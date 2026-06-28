@@ -139,8 +139,8 @@ create policy "products_insert_admin" on products
 drop policy if exists "products_update_auth" on products;
 drop policy if exists "products_update_admin" on products;
 create policy "products_update_admin" on products
-  for update using (has_role(auth.uid(), 'admin'))
-  with check (has_role(auth.uid(), 'admin'));
+  for update using (has_staff_role(auth.uid()))
+  with check (has_staff_role(auth.uid()));
 
 drop policy if exists "products_delete_auth" on products;
 drop policy if exists "products_delete_admin" on products;

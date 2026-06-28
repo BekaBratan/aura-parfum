@@ -23,9 +23,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Lock body scroll while sidebar is open (matches the public navbar behavior).
   useEffect(() => {
     if (typeof document === "undefined") return;
-    document.body.style.overflow = sideOpen ? "hidden" : "";
+    document.documentElement.classList.toggle("is-menu-open", sideOpen);
     return () => {
-      document.body.style.overflow = "";
+      document.documentElement.classList.remove("is-menu-open");
     };
   }, [sideOpen]);
 
