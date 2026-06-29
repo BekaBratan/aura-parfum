@@ -135,7 +135,7 @@ export function getQtyLabel(quantity: number, volume_ml: number | null, unit?: s
   return u === "ml" ? `${quantity} мл` : `${quantity} шт.`;
 }
 
-export function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string, kztRate: number): string {
+export function buildInvoiceWhatsAppText(order: Order, siteUrl: string, kztRate: number): string {
   const productLines = order.items.flatMap((item, index) => {
     const brand = item.category !== "accessory" && item.brand ? `${item.brand} ` : "";
     const qty = getQtyLabel(item.quantity, item.volume_ml, item.unit);
@@ -185,11 +185,13 @@ export function buildInvoiceWhatsAppText(order: Order, publicPdfUrl: string, kzt
     ...discountLines,
     `Итого: ${formatKzt(total)}`,
     `Статус оплаты: ${PAYMENT_STATUS_LABELS[order.payment_status]}`,
+    "",
+    "Ссылка на заказ:",
+    `${siteUrl}/invoice/${order.id}`,
+    "",
+    "PDF-накладная:",
+    `${siteUrl}/api/invoice/${order.id}/pdf`,
   ];
-
-  if (publicPdfUrl) {
-    lines.push("", "PDF-накладная:", publicPdfUrl);
-  }
 
   return encodeURIComponent(lines.join("\n"));
 }
