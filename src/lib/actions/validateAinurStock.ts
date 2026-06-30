@@ -1,6 +1,7 @@
 "use server";
 
 import { buildAinurStockMap } from "@/lib/ainur/server";
+import { normalizeProductName } from "@/lib/ainur/stockOverlay";
 
 export type ValidationItem = {
   product_id: string;
@@ -17,10 +18,16 @@ export async function validateAinurStock(items: ValidationItem[]): Promise<Valid
   const stockMap = await buildAinurStockMap(undefined, true);
 
   for (const item of items) {
-    // Product without ainur_id is managed by Supabase stock — skip Ainur check
-    if (!item.ainur_id) continue;
+    let available = 0;
 
-    const available = item.ainur_id in stockMap.byId ? stockMap.byId[item.ainur_id] : 0;
+    if (item.ainur_id && item.ainur_id in stockMap.byId) {
+      available = stockMap.byId[item.ainur_id];
+    } else {
+      const key = normalizeProductName(item.name);
+      if (key && key in stockMap.byName) {
+        available = stockMap.byName[key];
+      }
+    }
 
     if (item.quantity > available) {
       return {

@@ -28,8 +28,7 @@ export const EMPTY_STOCK_MAP: StockMap = { byId: {}, byName: {} };
  * Matching priority:
  *   1. exact `ainur_id` if the product has one set in Supabase
  *   2. fallback: normalized name match
- * Products with an `ainur_id` that isn't found in AinurPOS are treated as out of stock.
- * Products without `ainur_id` keep their original Supabase count.
+ * Products without a match keep their original Supabase count.
  */
 export function applyStockOverlay(products: Product[], stockMap: StockMap): Product[] {
   return products.map((p) => {
@@ -39,9 +38,6 @@ export function applyStockOverlay(products: Product[], stockMap: StockMap): Prod
     const key = normalizeProductName(p.name);
     if (key && key in stockMap.byName) {
       return { ...p, count: stockMap.byName[key] };
-    }
-    if (p.ainur_id) {
-      return { ...p, count: 0 };
     }
     return p;
   });

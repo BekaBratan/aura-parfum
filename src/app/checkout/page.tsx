@@ -303,8 +303,7 @@ export default function CheckoutPage() {
       toast.success("Заказ создан!");
 
       if (fullOrder) {
-        const siteUrl = window.location.origin;
-        const message = buildInvoiceWhatsAppText(fullOrder, siteUrl, kztRate);
+        const message = buildInvoiceWhatsAppText(fullOrder, "", kztRate);
         const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
         if (number) {
           window.open(`https://wa.me/${number.replace(/\D/g, "")}?text=${message}`, "_blank", "noopener,noreferrer");
