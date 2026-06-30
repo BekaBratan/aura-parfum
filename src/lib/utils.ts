@@ -1,6 +1,5 @@
-import type { Order, ProductCategory, ProductUnit } from "@/types";
+import type { ProductCategory, ProductUnit } from "@/types";
 import { formatKzt, convertToKzt } from "@/lib/currency";
-import { formatOrderItemDetails } from "@/lib/orderItemDetails";
 
 // Categories whose `price_usd` column stores a raw KZT amount (no USD conversion).
 // Same list also identifies categories sold by `pcs` rather than `ml`.
@@ -125,6 +124,7 @@ export function buildWhatsAppMessage(
 
   return encodeURIComponent(lines.join("\n"));
 }
+<<<<<<< HEAD
 
 export function itemKzt(priceUsd: number, category: string | null | undefined, kztRate: number): number {
   return isKztPriced(category) ? priceUsd : priceUsd * kztRate;
@@ -195,3 +195,5 @@ export function buildInvoiceWhatsAppText(order: Order, siteUrl: string, kztRate:
 
   return encodeURIComponent(lines.join("\n"));
 }
+=======
+>>>>>>> parent of dd6b687 (redirect checkout to WhatsApp, remove success page, move cancel to WhatsApp)

@@ -4,16 +4,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { ArrowLeft, Loader2, MessageCircle, ShoppingBag } from "lucide-react";
+import { ArrowLeft, Loader2, Send, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatPriceUsd, UNIT_LABELS, itemPriceKzt, isKztPriced, buildInvoiceWhatsAppText } from "@/lib/utils";
+import { formatPriceUsd, UNIT_LABELS, itemPriceKzt, isKztPriced } from "@/lib/utils";
 import { getOrderItemDetails } from "@/lib/orderItemDetails";
 import { useActiveDiscounts } from "@/lib/useDiscounts";
 import { calculateDiscounts } from "@/lib/discounts";
 import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
-import { CartItem, Order, Product } from "@/types";
+import { CartItem, Product } from "@/types";
 import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
 import { validateAinurStock } from "@/lib/actions/validateAinurStock";
 
@@ -298,16 +298,8 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Fetch full order for WhatsApp message
-      const { data: orderData } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("id", createdOrder.order_id)
-        .single();
-
-      const fullOrder = orderData as Order | null;
-
       clearCart();
+<<<<<<< HEAD
       toast.success("Заказ создан!");
 
       if (fullOrder) {
@@ -320,6 +312,10 @@ export default function CheckoutPage() {
       }
 
       router.push(`/invoice/${createdOrder.order_id}`);
+=======
+      toast.success("Заказ создан");
+      router.push(`/order/success?orderId=${createdOrder.order_id}`);
+>>>>>>> parent of dd6b687 (redirect checkout to WhatsApp, remove success page, move cancel to WhatsApp)
     } catch {
       toast.error("Что-то пошло не так");
       setSubmitting(false);
@@ -398,16 +394,16 @@ export default function CheckoutPage() {
             <button
               type="submit"
               disabled={submitting || refreshingStock || Boolean(stockIssue)}
-              className={stockIssue ? "btn btn-primary" : "btn btn-whatsapp"}
+              className="btn btn-primary"
             >
-              {submitting ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
+              {submitting ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
               {stockIssue
                 ? "Проверьте корзину перед оформлением"
                 : refreshingStock
                   ? "Обновляем остатки..."
                   : submitting
-                    ? "Отправляем в WhatsApp..."
-                    : "Подтвердить и отправить в WhatsApp"}
+                    ? "Создаем заказ..."
+                    : "Создать счет"}
             </button>
           </form>
 
