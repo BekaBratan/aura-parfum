@@ -6,17 +6,12 @@ import { useParams, useRouter } from "next/navigation";
 import * as pdfMake from "pdfmake/build/pdfmake";
 import pdfFonts from "pdfmake/build/vfs_fonts";
 <<<<<<< HEAD
-<<<<<<< HEAD
-=======
-import type { Content, TableCell, TDocumentDefinitions } from "pdfmake/interfaces";
->>>>>>> parent of 8f7d3f6 (Add server-side PDF API, unify WhatsApp message, fix stock overlay sync)
 import { Download, Loader2, MessageCircle, XCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
-import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, buildInvoiceWhatsAppText, itemKzt, getQtyLabel } from "@/lib/utils";
+import { buildInvoiceWhatsAppText, itemKzt, getQtyLabel, PAYMENT_STATUS_LABELS, ORDER_STATUS_LABELS } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
-<<<<<<< HEAD
 import { getOrderItemDetails } from "@/lib/orderItemDetails";
 =======
 import type { Content, TableCell, TDocumentDefinitions } from "pdfmake/interfaces";
@@ -27,14 +22,11 @@ import { Order } from "@/types";
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, isKztPriced } from "@/lib/utils";
 import { formatOrderItemDetails, getOrderItemDetails } from "@/lib/orderItemDetails";
 >>>>>>> parent of dd6b687 (redirect checkout to WhatsApp, remove success page, move cancel to WhatsApp)
-=======
-import { formatOrderItemDetails, getOrderItemDetails } from "@/lib/orderItemDetails";
->>>>>>> parent of 8f7d3f6 (Add server-side PDF API, unify WhatsApp message, fix stock overlay sync)
 import { useCurrencyStore } from "@/store/currencyStore";
+import { buildInvoicePdfDefinition, INVOICE_PDF_BUCKET, getInvoicePdfFileName, getInvoicePdfPath } from "@/lib/pdf";
 
 pdfMake.addVirtualFileSystem(pdfFonts);
 
-<<<<<<< HEAD
 <<<<<<< HEAD
 =======
 const INVOICE_PDF_BUCKET = "invoice-pdfs";
@@ -61,11 +53,6 @@ function formatKzt(price: number) {
 
   return `${amount.replace(/\s/g, " ")} тг`;
 }
-=======
-const INVOICE_PDF_BUCKET = "invoice-pdfs";
-
-
->>>>>>> parent of 8f7d3f6 (Add server-side PDF API, unify WhatsApp message, fix stock overlay sync)
 
 function formatInvoiceDate(value: string) {
   return new Date(value).toLocaleString("ru-RU", {
@@ -109,7 +96,6 @@ function buildProductCell(item: Order["items"][number]) {
   return { stack };
 }
 
-<<<<<<< HEAD
 function getQtyLabel(item: Order["items"][number]) {
   const unit = item.unit ?? (item.volume_ml ? "ml" : "pcs");
   return unit === "ml" ? `${item.quantity} мл` : `${item.quantity} шт.`;
@@ -126,15 +112,6 @@ function itemKzt(item: Order["items"][number], kztRate: number): number {
 function buildInvoicePdfDefinition(order: Order, kztRate: number): TDocumentDefinitions {
   const productRows: TableCell[][] = order.items.map((item) => {
     const priceKzt = itemKzt(item, kztRate);
-=======
-
-
-
-
-function buildInvoicePdfDefinition(order: Order, kztRate: number): TDocumentDefinitions {
-  const productRows: TableCell[][] = order.items.map((item) => {
-    const priceKzt = itemKzt(item.price_usd, item.category, kztRate);
->>>>>>> parent of 8f7d3f6 (Add server-side PDF API, unify WhatsApp message, fix stock overlay sync)
     const baseKzt = priceKzt * item.quantity;
     const discountKzt = Number(item.discount_kzt ?? 0);
     const hasDiscount = discountKzt > 0;
@@ -150,11 +127,7 @@ function buildInvoicePdfDefinition(order: Order, kztRate: number): TDocumentDefi
       : { text: formatKzt(baseKzt), alignment: "right" };
     return [
       buildProductCell(item) as TableCell,
-<<<<<<< HEAD
       { text: getQtyLabel(item), alignment: "center" },
-=======
-      { text: getQtyLabel(item.quantity, item.volume_ml, item.unit), alignment: "center" },
->>>>>>> parent of 8f7d3f6 (Add server-side PDF API, unify WhatsApp message, fix stock overlay sync)
       { text: formatKzt(priceKzt), alignment: "right" },
       sumCell,
     ];
@@ -196,13 +169,8 @@ function buildInvoicePdfDefinition(order: Order, kztRate: number): TDocumentDefi
             width: "*",
             stack: [
               { text: `Дата: ${formatInvoiceDate(order.created_at)}` },
-<<<<<<< HEAD
               { text: `Статус оплаты: ${PDF_PAYMENT_STATUS_LABELS[order.payment_status]}` },
               { text: `Статус заказа: ${PDF_ORDER_STATUS_LABELS[order.order_status]}` },
-=======
-              { text: `Статус оплаты: ${PAYMENT_STATUS_LABELS[order.payment_status]}` },
-              { text: `Статус заказа: ${ORDER_STATUS_LABELS[order.order_status]}` },
->>>>>>> parent of 8f7d3f6 (Add server-side PDF API, unify WhatsApp message, fix stock overlay sync)
             ],
           },
         ],
@@ -241,11 +209,7 @@ function buildInvoicePdfDefinition(order: Order, kztRate: number): TDocumentDefi
 }
 
 function buildPdfTotalsBlock(order: Order, kztRate: number) {
-<<<<<<< HEAD
   const subtotal = order.items.reduce((s, i) => s + itemKzt(i, kztRate) * i.quantity, 0);
-=======
-  const subtotal = order.items.reduce((s, i) => s + itemKzt(i.price_usd, i.category, kztRate) * i.quantity, 0);
->>>>>>> parent of 8f7d3f6 (Add server-side PDF API, unify WhatsApp message, fix stock overlay sync)
   const discountKzt = Number(order.discount_kzt ?? 0);
   const total = Math.max(0, subtotal - discountKzt);
   if (discountKzt <= 0) {
@@ -264,10 +228,7 @@ function buildPdfTotalsBlock(order: Order, kztRate: number) {
   ];
 }
 
-<<<<<<< HEAD
 >>>>>>> parent of dd6b687 (redirect checkout to WhatsApp, remove success page, move cancel to WhatsApp)
-=======
->>>>>>> parent of 8f7d3f6 (Add server-side PDF API, unify WhatsApp message, fix stock overlay sync)
 async function createInvoicePdfBlob(order: Order, kztRate: number) {
   return pdfMake.createPdf(buildInvoicePdfDefinition(order, kztRate)).getBlob();
 }
@@ -465,27 +426,16 @@ export default function InvoicePage() {
     }
   };
 
-  const sendToWhatsApp = async () => {
+  const sendToWhatsApp = () => {
     if (!order) return;
 
-    const result = pdfUrl ? null : await generateAndUploadPdf();
-    const publicPdfUrl = pdfUrl || result?.publicUrl || "";
-
-    if (!publicPdfUrl) {
-      toast.error("Сначала создайте публичную ссылку на PDF-накладную");
-      return;
-    }
-
+    const siteUrl = window.location.origin;
     const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
-<<<<<<< HEAD
 <<<<<<< HEAD
     const message = buildInvoiceWhatsAppText(order, siteUrl, kztRate);
 =======
     const message = encodeURIComponent(buildInvoiceWhatsAppText(order, publicPdfUrl, kztRate));
 >>>>>>> parent of dd6b687 (redirect checkout to WhatsApp, remove success page, move cancel to WhatsApp)
-=======
-    const message = buildInvoiceWhatsAppText(order, publicPdfUrl, kztRate);
->>>>>>> parent of 8f7d3f6 (Add server-side PDF API, unify WhatsApp message, fix stock overlay sync)
     window.open(`https://wa.me/${number}?text=${message}`, "_blank", "noopener,noreferrer");
   };
 
@@ -624,7 +574,6 @@ export default function InvoicePage() {
             <div className="invoice-actions">
               <button
                 onClick={sendToWhatsApp}
-                disabled={pdfGenerating}
                 className="btn btn-whatsapp"
               >
                 <Send size={17} />
