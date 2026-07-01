@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { CATEGORY_LABELS, CATEGORY_ORDER, GENDER_LABELS } from "@/lib/utils";
+import FloatingCartBar from "@/components/cart/FloatingCartBar";
 
 type CatalogViewMode = "grid" | "list";
 
@@ -709,6 +710,8 @@ function CatalogContent() {
           </>
         )}
       </div>
+
+      <FloatingCartBar />
     </div>
   );
 }

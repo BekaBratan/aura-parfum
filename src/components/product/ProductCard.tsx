@@ -19,6 +19,11 @@ type ProductCardVariant = "grid" | "list";
 
 const LIMIT_TOAST_ID = "stock-limit";
 
+function toastSuccess(msg: string) {
+  if (typeof window !== "undefined" && window.innerWidth < 768) return;
+  toast.success(msg);
+}
+
 function notifyLimit(productName: string) {
   toast.error(`Превышен лимит запаса: ${productName}`, { id: LIMIT_TOAST_ID });
 }
@@ -139,7 +144,7 @@ export default function ProductCard({
       code: product.code ?? null,
       min_volume: isMl ? minVolume : null,
     });
-    toast.success(`${product.name} добавлен в корзину`);
+          toastSuccess(`${product.name} добавлен в корзину`);
   };
 
   const handleVolumeClick = (e: React.MouseEvent, volume: number) => {
@@ -167,7 +172,7 @@ export default function ProductCard({
       code: product.code ?? null,
       min_volume: isMl ? minVolume : null,
     });
-    toast.success(`${product.name} (${volume} мл) добавлен в корзину`);
+    toastSuccess(`${product.name} (${volume} мл) добавлен в корзину`);
   };
 
   const handleQtyClick = (e: React.MouseEvent, qty: number) => {
@@ -191,7 +196,7 @@ export default function ProductCard({
       country_of_origin: product.country_of_origin ?? null,
       code: product.code ?? null,
     });
-    toast.success(`${product.name} (${safeQty} шт) добавлен в корзину`);
+    toastSuccess(`${product.name} (${safeQty} шт) добавлен в корзину`);
   };
 
   const priceDisplay = isMl

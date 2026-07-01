@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { ShoppingBag, Menu, X, Home, Layers } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
+import { useCurrencyStore } from "@/store/currencyStore";
+import { formatKzt } from "@/lib/currency";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 
@@ -11,10 +13,21 @@ const NAV_LINKS = [
   { href: "/catalog", label: "Каталог", icon: Layers },
 ];
 
+function pluralItems(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return `${n} товаров`;
+  if (mod10 === 1) return `${n} товар`;
+  if (mod10 >= 2 && mod10 <= 4) return `${n} товара`;
+  return `${n} товаров`;
+}
+
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const totalItems = useCartStore((s) => s.totalItems);
+  const items = useCartStore((s) => s.items);
+  const totalKzt = useCartStore((s) => s.totalKzt);
+  const kztRate = useCurrencyStore((s) => s.kztRate);
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
 
@@ -36,7 +49,8 @@ export default function Navbar() {
 
   if (isAdmin) return null;
 
-  const cartCount = mounted ? totalItems() : 0;
+  const cartCount = mounted ? items.length : 0;
+  const cartTotal = mounted && items.length > 0 ? totalKzt(kztRate) : 0;
 
   return (
     <>
@@ -67,11 +81,15 @@ export default function Navbar() {
             </nav>
 
             <div className="site-actions">
-              <Link href="/cart" className="icon-button site-cart-link" aria-label="Корзина">
-                <ShoppingBag size={20} />
-                {cartCount > 0 && (
-                  <span className="cart-count">{cartCount}</span>
-                )}
+              <Link
+                href="/cart"
+                className={`cart-header-button ${cartCount > 0 ? "has-items" : ""}`}
+                aria-label="Корзина"
+              >
+                <ShoppingBag size={cartCount > 0 ? 18 : 20} />
+                <span className="cart-header-text">
+                  {pluralItems(cartCount)} ({formatKzt(cartTotal)})
+                </span>
               </Link>
 
               <button
