@@ -53,7 +53,7 @@ const DEFAULT_FILTERS: FilterState = {
   volumes: [],
   priceMin: null,
   priceMax: null,
-  inStockOnly: true,
+  inStockOnly: false,
   sortBy: "name_asc",
   category: null,
   attributeFilters: {},
@@ -102,13 +102,9 @@ function CatalogContent() {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<CatalogViewMode>("grid");
 
-  const rawShowOutOfStock = searchParams.get("showOutOfStock");
-  const initialInStockOnly = rawShowOutOfStock === "true" ? false : true;
-
   const [filters, setFilters] = useState<FilterState>({
     ...DEFAULT_FILTERS,
     category: activeCategory,
-    inStockOnly: initialInStockOnly,
   });
 
   // Persist view mode
@@ -363,9 +359,8 @@ function CatalogContent() {
   }, []);
 
   const clearFilters = () => {
-    setFilters({ ...DEFAULT_FILTERS, category: activeCategory, sortBy: filters.sortBy, inStockOnly: true });
+    setFilters({ ...DEFAULT_FILTERS, category: activeCategory, sortBy: filters.sortBy, inStockOnly: false });
     const params = new URLSearchParams(searchParams.toString());
-    params.delete("showOutOfStock");
     router.replace(`${pathname}?${params.toString()}`);
     setPage(1);
   };
@@ -621,13 +616,6 @@ function CatalogContent() {
                 checked={!filters.inStockOnly}
                 onChange={(e) => {
                   setFilters((prev) => ({ ...prev, inStockOnly: !e.target.checked }));
-                  const params = new URLSearchParams(searchParams.toString());
-                  if (e.target.checked) {
-                    params.set("showOutOfStock", "true");
-                  } else {
-                    params.delete("showOutOfStock");
-                  }
-                  router.replace(`${pathname}?${params.toString()}`);
                 }}
               />
               Показать отсутствующие
