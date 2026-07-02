@@ -77,6 +77,58 @@ export async function getAinurProduct(id: string): Promise<AinurProduct> {
   return ainurFetch<AinurProduct>(`/product/${id}`);
 }
 
+// POST request helper (no caching, sends JSON body).
+async function ainurPost<T>(path: string, body: unknown): Promise<T> {
+  const url = new URL(BASE_URL + path);
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      "X-AINUR-API-Access-Token": getToken(),
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Ainur POST ${path} → ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
+  }
+
+  return (await res.json()) as T;
+}
+
+export interface AinurSaleProduct {
+  product_id: string;
+  quantity: number;
+  discount_percent: number;
+  unit: string;
+  barcode?: string | null;
+}
+
+export interface AinurSalePaymentDetails {
+  sum: number;
+  type: "debit" | "credit";
+  status: boolean;
+  date: string;
+}
+
+export interface CreateAinurSalePayload {
+  status: boolean;
+  store_id: string;
+  customer_id: string;
+  date: string;
+  discount_percent: number;
+  discount_sum: number;
+  products: AinurSaleProduct[];
+  payment_details?: AinurSalePaymentDetails | null;
+  comment?: string;
+}
+
+export async function createAinurSale(payload: CreateAinurSalePayload): Promise<{ status: boolean; error?: string }> {
+  return ainurPost("/sales", payload);
+}
+
 // Categories rarely change — cache in-process for the lifetime of the Lambda/server instance.
 let categoriesCache: { ts: number; data: AinurCategory[] } | null = null;
 const CATEGORIES_TTL_MS = 5 * 60_000;

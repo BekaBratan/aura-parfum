@@ -262,7 +262,7 @@ export default function CheckoutPage() {
           quantity: Number(item.quantity),
           volume_ml: item.volume_ml,
           image_url: item.image_url,
-          // Per-line discount snapshot — RPC merges these into the stored item JSON.
+          ainur_id: item.ainur_id ?? null,
           discount_kzt: line && line.discountKzt > 0 ? Math.round(line.discountKzt) : null,
           applied_discount_name: line && line.discountKzt > 0 ? ruleName : null,
         };
