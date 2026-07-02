@@ -2764,6 +2764,10 @@ img {
     display: none;
   }
 
+  .cart-header-button {
+    display: none;
+  }
+
   .benefits-grid,
   .site-footer-grid,
   .product-detail-grid,

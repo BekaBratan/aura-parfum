@@ -1,29 +1,46 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Eye, Search, X } from "lucide-react";
+import { ChevronDown, ExternalLink, Eye, Loader2, Search, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
+import { confirmPaymentAndSync } from "@/lib/actions/confirmPaymentAndSync";
 import { Order } from "@/types";
-import { formatPrice, ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS, isKztPriced } from "@/lib/utils";
+import { formatPrice, isKztPriced } from "@/lib/utils";
 import { getOrderItemDetails } from "@/lib/orderItemDetails";
 import { useCurrencyStore } from "@/store/currencyStore";
 import { OrderItem } from "@/types";
 
-const ORDER_STATUS_CLASSES: Record<string, string> = {
-  new: "bg-blue-500/10 text-blue-400",
-  confirmed: "bg-yellow-500/10 text-yellow-400",
-  shipped: "bg-purple-500/10 text-purple-400",
-  delivered: "bg-green-500/10 text-green-400",
-  cancelled: "bg-red-500/10 text-red-400",
+const STATUS_OPTIONS: Record<string, { label: string; className: string }> = {
+  awaiting_payment: { label: "Ожидает оплаты", className: "bg-yellow-500/10 text-yellow-400" },
+  paid: { label: "Оплачено (выполнен)", className: "bg-green-500/10 text-green-400" },
+  failed: { label: "Ошибка заказа", className: "bg-red-500/10 text-red-400" },
+  cancelled: { label: "Отменён", className: "bg-red-500/10 text-red-400" },
 };
 
-const PAYMENT_STATUS_CLASSES: Record<string, string> = {
-  pending_payment: "bg-yellow-500/10 text-yellow-400",
-  paid: "bg-green-500/10 text-green-400",
-  failed: "bg-red-500/10 text-red-400",
-  refunded: "bg-purple-500/10 text-purple-400",
+function deriveStatus(order: Order): { key: string; label: string; className: string } {
+  if (order.order_status === "cancelled" || order.payment_status === "refunded")
+    return { key: "cancelled", ...STATUS_OPTIONS.cancelled };
+  if (order.payment_status === "paid") return { key: "paid", ...STATUS_OPTIONS.paid };
+  if (order.payment_status === "pending_payment") return { key: "awaiting_payment", ...STATUS_OPTIONS.awaiting_payment };
+  if (order.payment_status === "failed") return { key: "failed", ...STATUS_OPTIONS.failed };
+  return { key: "awaiting_payment", ...STATUS_OPTIONS.awaiting_payment };
+}
+
+const DROPDOWN_LABELS: Record<string, string> = {
+  awaiting_payment: "Ожидает оплаты",
+  paid: "Оплачено (выполнен)",
+  cancelled: "Отменён",
+  failed: "Ошибка заказа",
 };
+
+const FILTER_OPTIONS = [
+  { key: "all", label: "Все" },
+  { key: "awaiting_payment", label: "Ожидают" },
+  { key: "paid", label: "Выполнен" },
+  { key: "failed", label: "Ошибка" },
+  { key: "cancelled", label: "Отменён" },
+];
 
 // For KZT-priced categories (accessory, original, analog) price_usd already holds KZT.
 // Oil/perfume store real USD and need conversion.
@@ -42,8 +59,10 @@ export default function AdminOrders() {
   const [detail, setDetail] = useState<Order | null>(null);
 
   const [search, setSearch] = useState("");
-  const [filterOrderStatus, setFilterOrderStatus] = useState("all");
-  const [filterPayStatus, setFilterPayStatus] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [syncingId, setSyncingId] = useState<string | null>(null);
 
   const loadOrders = useCallback(async () => {
     const supabase = createClient();
@@ -62,8 +81,17 @@ export default function AdminOrders() {
 
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
-      if (filterOrderStatus !== "all" && o.order_status !== filterOrderStatus) return false;
-      if (filterPayStatus !== "all" && o.payment_status !== filterPayStatus) return false;
+      const st = deriveStatus(o);
+      if (filterStatus !== "all" && st.key !== filterStatus) return false;
+      if (filterDateFrom) {
+        const from = new Date(filterDateFrom);
+        if (new Date(o.created_at) < from) return false;
+      }
+      if (filterDateTo) {
+        const to = new Date(filterDateTo);
+        to.setDate(to.getDate() + 1);
+        if (new Date(o.created_at) >= to) return false;
+      }
       if (search) {
         const q = search.toLowerCase();
         if (
@@ -74,49 +102,68 @@ export default function AdminOrders() {
       }
       return true;
     });
-  }, [orders, search, filterOrderStatus, filterPayStatus]);
+  }, [orders, search, filterStatus, filterDateFrom, filterDateTo]);
 
-  const updateOrder = async (id: string, field: "payment_status" | "order_status", value: string) => {
-    const supabase = createClient();
-
-    // Restore stock when cancelling an order
-    if (field === "order_status" && value === "cancelled") {
-      const order = orders.find((o) => o.id === id);
-      if (order && order.order_status !== "cancelled") {
-        for (const item of order.items) {
-          const { data: product } = await supabase
+  const handleStatusChange = async (order: Order, value: string) => {
+    if (value === "paid") {
+      if (!confirm(`Подтвердить оплату заказа ${order.invoice_number} и синхронизировать с AinurPOS?`)) return;
+      const result = await confirmPaymentAndSync(order.id);
+      if ("error" in result) {
+        toast.error(result.error);
+      } else {
+        toast.success("Оплата подтверждена и синхронизирована с AinurPOS");
+      }
+      await loadOrders();
+      return;
+    }
+    if (value === "cancelled") {
+      if (!confirm(`Отменить заказ ${order.invoice_number}? Запас товаров будет восстановлен.`)) return;
+      const supabase = createClient();
+      for (const item of order.items) {
+        const { data: product } = await supabase
+          .from("products")
+          .select("count")
+          .eq("id", item.product_id)
+          .single();
+        if (product) {
+          await supabase
             .from("products")
-            .select("count")
-            .eq("id", item.product_id)
-            .single();
-          if (product) {
-            await supabase
-              .from("products")
-              .update({ count: Number(product.count) + item.quantity })
-              .eq("id", item.product_id);
-          }
+            .update({ count: Number(product.count) + item.quantity })
+            .eq("id", item.product_id);
         }
       }
+      const { error } = await supabase
+        .from("orders")
+        .update({ order_status: "cancelled", payment_status: "refunded" })
+        .eq("id", order.id);
+      if (error) {
+        toast.error("Не удалось отменить заказ");
+      } else {
+        toast.success("Заказ отменён. Запас товаров восстановлен.");
+      }
+      await loadOrders();
+      return;
     }
-
-    const { error } = await supabase
-      .from("orders")
-      .update({ [field]: value })
-      .eq("id", id);
-
+    if (value === order.payment_status || value === order.order_status) return;
+    const lookup: Record<string, { payment?: string; order?: string }> = {
+      awaiting_payment: { payment: "pending_payment", order: "new" },
+      failed: { payment: "failed" },
+    };
+    const mapping = lookup[value];
+    if (!mapping) return;
+    let updatePayload: Record<string, string> = {};
+    if (mapping.payment) updatePayload.payment_status = mapping.payment;
+    if (mapping.order) updatePayload.order_status = mapping.order;
+    const supabase = createClient();
+    const { error } = await supabase.from("orders").update(updatePayload).eq("id", order.id);
     if (error) {
       toast.error("Не удалось обновить статус");
       return;
     }
-
-    toast.success(
-      field === "order_status" && value === "cancelled"
-        ? "Заказ отменён. Запас товаров восстановлен."
-        : "Статус обновлён"
-    );
-    setOrders((current) => current.map((order) => (order.id === id ? { ...order, [field]: value } : order)));
-    if (detail?.id === id) {
-      setDetail((current) => (current ? { ...current, [field]: value } : null));
+    toast.success("Статус обновлён");
+    setOrders((current) => current.map((o) => (o.id === order.id ? { ...o, ...updatePayload } : o)));
+    if (detail?.id === order.id) {
+      setDetail((current) => (current ? { ...current, ...updatePayload } : null));
     }
   };
 
@@ -152,13 +199,9 @@ export default function AdminOrders() {
           <div className="admin-filter-group">
             <span className="admin-filter-label">Статус</span>
             <div className="admin-filter-pills">
-              <button onClick={() => setFilterOrderStatus("all")}
-                className={`admin-filter-pill${filterOrderStatus === "all" ? " is-active" : ""}`}>
-                Все
-              </button>
-              {Object.entries(ORDER_STATUS_LABELS).map(([val, label]) => (
-                <button key={val} onClick={() => setFilterOrderStatus(val)}
-                  className={`admin-filter-pill${filterOrderStatus === val ? " is-active" : ""}`}>
+              {FILTER_OPTIONS.map(({ key, label }) => (
+                <button key={key} onClick={() => setFilterStatus(key)}
+                  className={`admin-filter-pill${filterStatus === key ? " is-active" : ""}`}>
                   {label}
                 </button>
               ))}
@@ -168,18 +211,31 @@ export default function AdminOrders() {
           <div className="admin-filter-divider" />
 
           <div className="admin-filter-group">
-            <span className="admin-filter-label">Оплата</span>
-            <div className="admin-filter-pills">
-              <button onClick={() => setFilterPayStatus("all")}
-                className={`admin-filter-pill${filterPayStatus === "all" ? " is-active" : ""}`}>
-                Все
-              </button>
-              {Object.entries(PAYMENT_STATUS_LABELS).map(([val, label]) => (
-                <button key={val} onClick={() => setFilterPayStatus(val)}
-                  className={`admin-filter-pill${filterPayStatus === val ? " is-active" : ""}`}>
-                  {label}
+            <span className="admin-filter-label">Дата</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="input-dark text-xs py-1.5 px-2"
+                title="От"
+              />
+              <span className="text-xs text-[var(--text-secondary)]">—</span>
+              <input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="input-dark text-xs py-1.5 px-2"
+                title="До"
+              />
+              {(filterDateFrom || filterDateTo) && (
+                <button
+                  onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); }}
+                  className="text-xs text-[var(--text-secondary)] hover:text-red-400 transition-colors cursor-pointer"
+                >
+                  <X size={14} />
                 </button>
-              ))}
+              )}
             </div>
           </div>
         </div>
@@ -198,46 +254,46 @@ export default function AdminOrders() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)] text-left text-[var(--text-secondary)]">
-                <th className="pb-3 pr-4">Счет</th>
-                <th className="pb-3 pr-4 hidden sm:table-cell">Телефон</th>
-                <th className="pb-3 pr-4 hidden md:table-cell">Сумма</th>
-                <th className="pb-3 pr-4">Статус оплаты</th>
-                <th className="pb-3 pr-4">Статус заказа</th>
-                <th className="pb-3 text-right">Действия</th>
+                <th className="pb-1.5 pr-3 whitespace-nowrap">Счёт</th>
+                <th className="pb-1.5 pr-3 whitespace-nowrap hidden sm:table-cell">Телефон</th>
+                <th className="pb-1.5 pr-3 whitespace-nowrap hidden md:table-cell">Сумма</th>
+                <th className="pb-1.5 pr-3 whitespace-nowrap">Статус</th>
+                <th className="pb-1.5 pr-3 whitespace-nowrap hidden lg:table-cell">Дата</th>
+                <th className="pb-1.5 whitespace-nowrap text-right">Подробнее</th>
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((order) => (
-                <tr key={order.id} className="border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors">
-                  <td className="py-3 pr-4">
-                    <p className="text-[var(--text-primary)] font-medium">{order.invoice_number}</p>
-                    <p className="text-xs text-[var(--text-secondary)]">{order.customer_name}</p>
-                  </td>
-                  <td className="py-3 pr-4 text-[var(--text-secondary)] hidden sm:table-cell">{order.customer_phone}</td>
-                  <td className="py-3 pr-4 text-[var(--gold)] hidden md:table-cell">{formatPrice(orderTotalKzt(order.items, kztRate))}</td>
-                  <td className="py-3 pr-4">
-                    <StatusSelect
-                      value={order.payment_status}
-                      labels={PAYMENT_STATUS_LABELS}
-                      className={PAYMENT_STATUS_CLASSES[order.payment_status]}
-                      onChange={(value) => updateOrder(order.id, "payment_status", value)}
-                    />
-                  </td>
-                  <td className="py-3 pr-4">
-                    <StatusSelect
-                      value={order.order_status}
-                      labels={ORDER_STATUS_LABELS}
-                      className={ORDER_STATUS_CLASSES[order.order_status]}
-                      onChange={(value) => updateOrder(order.id, "order_status", value)}
-                    />
-                  </td>
-                  <td className="py-3 text-right">
-                    <button onClick={() => setDetail(order)} className="p-2 text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors cursor-pointer">
-                      <Eye size={15} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredOrders.map((order) => {
+                const status = deriveStatus(order);
+                return (
+                  <tr key={order.id} className="border-b border-[var(--border)]/50 hover:bg-white/[0.02] transition-colors">
+                    <td className="py-2 pr-3">
+                      <p className="text-[var(--text-primary)] font-medium">{order.invoice_number}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">{order.customer_name}</p>
+                    </td>
+                    <td className="py-2 pr-3 text-[var(--text-secondary)] hidden sm:table-cell">{order.customer_phone}</td>
+                    <td className="py-2 pr-3 text-[var(--gold)] hidden md:table-cell whitespace-nowrap">{formatPrice(orderTotalKzt(order.items, kztRate))}</td>
+                    <td className="py-2 pr-3">
+                      <StatusSelect
+                        value={status.key}
+                        labels={DROPDOWN_LABELS}
+                        className={status.className}
+                        disabled={syncingId === order.id}
+                        onChange={(value) => handleStatusChange(order, value)}
+                      />
+                    </td>
+                    <td className="py-2 pr-3 text-[var(--text-secondary)] hidden lg:table-cell whitespace-nowrap text-xs">
+                      {new Date(order.created_at).toLocaleString("ru-RU", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                    <td className="py-2 text-right">
+                      <button onClick={() => setDetail(order)} className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)] hover:text-[var(--gold)] transition-colors cursor-pointer px-1.5 py-0.5 rounded-md hover:bg-white/[0.03]">
+                        <Eye size={14} />
+                        <span>Детали</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -247,7 +303,12 @@ export default function AdminOrders() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="glass-card w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 bg-[var(--dark-2)]">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-bold text-[var(--text-primary)]">{detail.invoice_number}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold text-[var(--text-primary)]">{detail.invoice_number}</h2>
+                <a href={`/invoice/${detail.id}`} target="_blank" rel="noopener noreferrer" className="text-[var(--gold)] hover:text-[var(--gold-light)] transition-colors" title="Открыть страницу счёта">
+                  <ExternalLink size={16} />
+                </a>
+              </div>
               <button onClick={() => setDetail(null)} className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer">
                 <X size={20} />
               </button>
@@ -259,8 +320,7 @@ export default function AdminOrders() {
               <Row label="Телефон" value={detail.customer_phone} />
               <Row label="Город" value={detail.customer_city} />
               <Row label="Адрес" value={detail.customer_address} />
-              <Row label="Статус оплаты" value={PAYMENT_STATUS_LABELS[detail.payment_status] || detail.payment_status} />
-              <Row label="Статус заказа" value={ORDER_STATUS_LABELS[detail.order_status] || detail.order_status} />
+              <Row label="Статус" value={deriveStatus(detail).label} />
               {detail.comment && <Row label="Комментарий" value={detail.comment} />}
 
               <div className="border-t border-[var(--border)] pt-3 mt-3">
@@ -336,10 +396,11 @@ export default function AdminOrders() {
   );
 }
 
-function StatusSelect({ value, labels, className, onChange }: {
+function StatusSelect({ value, labels, className, disabled, onChange }: {
   value: string;
   labels: Record<string, string>;
   className?: string;
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -347,7 +408,8 @@ function StatusSelect({ value, labels, className, onChange }: {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`appearance-none text-xs px-3 py-1 pr-7 rounded-full cursor-pointer border-0 outline-none ${className || ""}`}
+        disabled={disabled}
+        className={`appearance-none text-xs px-3 py-1 pr-7 rounded-full border-0 outline-none ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${className || ""}`}
       >
         {Object.entries(labels).map(([optionValue, label]) => (
           <option key={optionValue} value={optionValue}>{label}</option>
