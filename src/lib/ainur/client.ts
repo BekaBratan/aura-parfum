@@ -18,10 +18,13 @@ function getToken(): string {
 
 type QueryValue = string | number | undefined | null | Array<string | number>;
 
+const AINUR_TIMEOUT_MS = 10_000;
+
 async function ainurFetch<T>(
   path: string,
   params?: Record<string, QueryValue>,
   revalidateSeconds = 180,
+  timeoutMs = AINUR_TIMEOUT_MS,
 ): Promise<T> {
   const url = new URL(BASE_URL + path);
   if (params) {
@@ -35,21 +38,29 @@ async function ainurFetch<T>(
     }
   }
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      "X-AINUR-API-Access-Token": getToken(),
-      Accept: "application/json",
-    },
-    // Ainur reconciles its catalog every 3 minutes — match that to avoid stale data without hammering.
-    next: { revalidate: revalidateSeconds },
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Ainur ${path} → ${res.status} ${res.statusText} ${body.slice(0, 200)}`);
+  try {
+    const res = await fetch(url.toString(), {
+      signal: controller.signal,
+      headers: {
+        "X-AINUR-API-Access-Token": getToken(),
+        Accept: "application/json",
+      },
+      // Ainur reconciles its catalog every 3 minutes — match that to avoid stale data without hammering.
+      next: { revalidate: revalidateSeconds },
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Ainur ${path} → ${res.status} ${res.statusText} ${body.slice(0, 200)}`);
+    }
+
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
   }
-
-  return (await res.json()) as T;
 }
 
 export interface ListProductsOptions {
@@ -60,6 +71,7 @@ export interface ListProductsOptions {
   minPrice?: number;
   maxPrice?: number;
   _revalidate?: number;
+  _timeoutMs?: number;
 }
 
 export async function listAinurProducts(options: ListProductsOptions = {}): Promise<AinurProduct[]> {
@@ -70,7 +82,7 @@ export async function listAinurProducts(options: ListProductsOptions = {}): Prom
     "ids": options.ids,
     min_price: options.minPrice,
     max_price: options.maxPrice,
-  }, options._revalidate);
+  }, options._revalidate, options._timeoutMs);
 }
 
 export async function getAinurProduct(id: string): Promise<AinurProduct> {
@@ -80,22 +92,30 @@ export async function getAinurProduct(id: string): Promise<AinurProduct> {
 // POST request helper (no caching, sends JSON body).
 async function ainurPost<T>(path: string, body: unknown): Promise<T> {
   const url = new URL(BASE_URL + path);
-  const res = await fetch(url.toString(), {
-    method: "POST",
-    headers: {
-      "X-AINUR-API-Access-Token": getToken(),
-      "Content-Type": "application/json",
-      Accept: "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AINUR_TIMEOUT_MS);
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Ainur POST ${path} → ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
+  try {
+    const res = await fetch(url.toString(), {
+      signal: controller.signal,
+      method: "POST",
+      headers: {
+        "X-AINUR-API-Access-Token": getToken(),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Ainur POST ${path} → ${res.status} ${res.statusText} ${text.slice(0, 200)}`);
+    }
+
+    return (await res.json()) as T;
+  } finally {
+    clearTimeout(timer);
   }
-
-  return (await res.json()) as T;
 }
 
 export interface AinurSaleProduct {

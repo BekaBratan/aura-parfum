@@ -3,6 +3,10 @@
     {
       "path": "/api/currencies/refresh",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/stock/sync",
+      "schedule": "5 0 * * *"
     }
   ]
 }

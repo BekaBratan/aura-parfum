@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Globe, Loader2, Plus, Tag, Trash2, X } from "lucide-react";
+import { CheckCircle, Clock, Database, Globe, Loader2, Plus, RefreshCw, Tag, Trash2, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAdminRole } from "@/lib/adminRole";
 
@@ -132,9 +132,9 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-3">Доступ запрещён</h1>
         <p className="text-sm text-[var(--text-secondary)]">Настройки доступны только администратору.</p>
-      </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div>
@@ -245,6 +245,8 @@ export default function SettingsPage() {
       </div>
 
       <PresetsEditor />
+
+      <StockSyncSection />
     </div>
   );
 }
@@ -480,5 +482,131 @@ function PresetsEditor() {
         )}
       </div>
     </div>
+  );
+}
+
+interface SyncLogEntry {
+  id: number;
+  triggered_by: string;
+  admin_email: string | null;
+  total_products: number;
+  updated_count: number;
+  errors: unknown[] | null;
+  created_at: string;
+}
+
+function StockSyncSection() {
+  const [logs, setLogs] = useState<SyncLogEntry[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const loadLogs = useCallback(async () => {
+    const res = await fetch("/api/stock/sync");
+    if (!res.ok) { setLoading(false); return; }
+    const json = await res.json();
+    setLogs(json.data ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => void loadLogs(), 0);
+    return () => window.clearTimeout(t);
+  }, [loadLogs]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    const res = await fetch("/api/stock/sync", { method: "POST" });
+    setSyncing(false);
+    if (!res.ok) {
+      const d = await res.json();
+      toast.error(d.error ?? "Ошибка синхронизации");
+      return;
+    }
+    const result = await res.json();
+    const msg = result.errors?.length
+      ? `Обновлено ${result.updated} из ${result.total}. Ошибок: ${result.errors.length}`
+      : `Обновлено ${result.updated} из ${result.total}`;
+    toast.success(msg);
+    await loadLogs();
+  };
+
+  const last = logs[0];
+
+  return (
+    <>
+      <div className="mt-10 mb-6 flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-[var(--gold)]/15 grid place-items-center text-[var(--gold)]">
+          <Database size={20} />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Синхронизация стока</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+            Копирование остатков из AinurPOS в Supabase
+          </p>
+        </div>
+      </div>
+
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            {loading ? (
+              <div className="h-4 w-48 skeleton rounded" />
+            ) : last ? (
+              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <Clock size={14} />
+                <span>
+                  Последняя синхронизация:{" "}
+                  {new Date(last.created_at).toLocaleString("ru-RU")}
+                </span>
+                {last.errors?.length ? (
+                  <span className="text-red-400 flex items-center gap-1">
+                    <X size={14} /> {last.errors.length} ошибок
+                  </span>
+                ) : (
+                  <span className="text-green-400 flex items-center gap-1">
+                    <CheckCircle size={14} /> {last.updated_count} из {last.total_products}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--text-secondary)]">
+                Синхронизация ещё не выполнялась
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="btn-gold"
+          >
+            {syncing ? (
+              <Loader2 size={14} className="animate-spin relative z-10" />
+            ) : (
+              <RefreshCw size={14} className="relative z-10" />
+            )}
+            <span className="relative z-10">Синхронизировать</span>
+          </button>
+        </div>
+
+        {logs.length > 1 && (
+          <details className="text-xs text-[var(--text-secondary)]">
+            <summary className="cursor-pointer hover:text-[var(--text-primary)] transition-colors">
+              История синхронизаций ({logs.length})
+            </summary>
+            <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+              {logs.map((entry) => (
+                <div key={entry.id} className="flex items-center justify-between py-1 px-2 rounded hover:bg-white/[0.03]">
+                  <span>{new Date(entry.created_at).toLocaleString("ru-RU")}</span>
+                  <span className={entry.errors?.length ? "text-red-400" : "text-green-400"}>
+                    {entry.updated_count}/{entry.total_products}
+                    {entry.errors?.length ? ` (${entry.errors.length} ошиб.)` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
+      </div>
+    </>
   );
 }

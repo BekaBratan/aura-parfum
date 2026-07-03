@@ -32,6 +32,9 @@ export const EMPTY_STOCK_MAP: StockMap = { byId: {}, byName: {} };
  * Products without `ainur_id` keep their original Supabase count.
  */
 export function applyStockOverlay(products: Product[], stockMap: StockMap): Product[] {
+  const isEmpty = Object.keys(stockMap.byId).length === 0 && Object.keys(stockMap.byName).length === 0;
+  if (isEmpty) return products;
+
   return products.map((p) => {
     if (p.ainur_id && p.ainur_id in stockMap.byId) {
       return { ...p, count: stockMap.byId[p.ainur_id] };
@@ -47,19 +50,40 @@ export function applyStockOverlay(products: Product[], stockMap: StockMap): Prod
   });
 }
 
+const STOCK_FETCH_TIMEOUT_MS = 8_000;
+
 // Client-side fetch — used from "use client" components. Hits our /api/stock proxy.
+// Returns EMPTY_STOCK_MAP when AinurPOS is unreachable or times out — falls back to Supabase counts.
 export async function fetchAinurStockMap(): Promise<StockMap> {
-  const res = await fetch("/api/stock", { cache: "no-store" });
-  if (!res.ok) throw new Error(`/api/stock failed: ${res.status}`);
-  const json = (await res.json()) as { data?: StockMap; error?: string };
-  if (json.error || !json.data) throw new Error(json.error ?? "Empty stock map");
-  return json.data;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), STOCK_FETCH_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch("/api/stock", { signal: controller.signal, cache: "no-store" });
+    } finally {
+      clearTimeout(timer);
+    }
+    if (!res.ok) throw new Error(`/api/stock failed: ${res.status}`);
+    const json = (await res.json()) as { data?: StockMap; error?: string };
+    if (json.error || !json.data) throw new Error(json.error ?? "Empty stock map");
+    return json.data;
+  } catch (err) {
+    console.warn("fetchAinurStockMap: AinurPOS недоступен, использую Supabase count", err);
+    return EMPTY_STOCK_MAP;
+  }
 }
 
 // Server-side fetch — used from server components like the home page.
 // Imports the Ainur server helper lazily to avoid pulling the secret token
 // into any client bundle.
+// Returns EMPTY_STOCK_MAP when AinurPOS is unreachable.
 export async function fetchAinurStockMapServer(): Promise<StockMap> {
-  const { buildAinurStockMap } = await import("./server");
-  return buildAinurStockMap();
+  try {
+    const { buildAinurStockMap } = await import("./server");
+    return await buildAinurStockMap();
+  } catch (err) {
+    console.warn("fetchAinurStockMapServer: AinurPOS недоступен, использую Supabase count", err);
+    return EMPTY_STOCK_MAP;
+  }
 }

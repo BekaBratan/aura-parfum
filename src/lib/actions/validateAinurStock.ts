@@ -16,10 +16,14 @@ export type ValidationResult =
   | { valid: false; error: "OUT_OF_STOCK"; itemName: string; requested: number; available: number };
 
 export async function validateAinurStock(items: ValidationItem[]): Promise<ValidationResult> {
-  const [stockMap, supabase] = await Promise.all([
-    buildAinurStockMap(undefined, true),
-    createClient(),
-  ]);
+  let stockMap: Awaited<ReturnType<typeof buildAinurStockMap>>;
+  try {
+    stockMap = await buildAinurStockMap(undefined, true);
+  } catch (err) {
+    console.warn("validateAinurStock: AinurPOS недоступен, пропускаю проверку", err);
+    return { valid: true };
+  }
+  const supabase = await createClient();
 
   // Build a map of locked quantities from unpaid Ainur-linked orders
   const { data: pendingOrders } = await supabase
