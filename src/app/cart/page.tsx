@@ -101,6 +101,18 @@ export default function CartPage() {
     [discountResult.applied],
   );
 
+  const MIN_ORDER_KZT = 30000;
+  const restrictedCategories = useMemo(() => new Set(["oil", "perfume", "accessory"]), []);
+  const restrictedTotal = useMemo(
+    () => items
+      .filter((item) => restrictedCategories.has(item.category))
+      .reduce((sum, item) => {
+        const line = lineByProductId.get(item.product_id);
+        return sum + (line ? line.finalKzt : itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity);
+      }, 0),
+    [items, restrictedCategories, lineByProductId, kztRate],
+  );
+
   const refreshCartProducts = useCallback(
     async ({ showToast = false } = {}) => {
       const currentItems = useCartStore.getState().items;
@@ -405,9 +417,31 @@ export default function CartPage() {
               </button>
             </>
           ) : (
-            <Link href="/checkout" className="btn btn-primary cart-checkout">
-              Оформить заказ <ArrowRight size={16} />
-            </Link>
+            <>
+              {restrictedTotal < MIN_ORDER_KZT && (
+                <div className="min-order-warning">
+                  <div className="min-order-header">
+                    <span>Минимальная сумма заказа (парфюм, масла, аксессуары)</span>
+                    <strong>{formatKzt(MIN_ORDER_KZT)}</strong>
+                  </div>
+                  <div className="min-order-bar-track">
+                    <div
+                      className="min-order-bar-fill"
+                      style={{ width: `${Math.min(100, (restrictedTotal / MIN_ORDER_KZT) * 100)}%` }}
+                    />
+                  </div>
+                  <div className="min-order-footer">
+                    <span>{formatKzt(restrictedTotal)}</span>
+                    <span className={restrictedTotal >= MIN_ORDER_KZT ? "text-green-400" : "text-red-400"}>
+                      {restrictedTotal >= MIN_ORDER_KZT ? "✅" : `Ещё ${formatKzt(MIN_ORDER_KZT - restrictedTotal)}`}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <Link href="/checkout" className="btn btn-primary cart-checkout">
+                Оформить заказ <ArrowRight size={16} />
+              </Link>
+            </>
           )}
           <button
             type="button"

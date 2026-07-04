@@ -2375,6 +2375,57 @@ img {
   margin-top: 18px;
 }
 
+.min-order-warning {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 10px;
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+}
+
+.min-order-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--color-text);
+  margin-bottom: 10px;
+}
+
+.min-order-header strong {
+  color: #d97706;
+}
+
+.min-order-bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.min-order-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #d97706;
+  transition: width 0.3s;
+}
+
+.min-order-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.text-red-400 {
+  color: #ef4444;
+}
+
+.text-green-400 {
+  color: #22c55e;
+}
+
 .checkout-grid,
 .invoice-grid {
   display: grid;
