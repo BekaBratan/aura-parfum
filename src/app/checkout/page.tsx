@@ -397,7 +397,7 @@ export default function CheckoutPage() {
                   ? "Обновляем остатки..."
                   : submitting
                     ? "Создаём заказ..."
-                    : "Подтвердить данные и отправить в WhatsApp"}
+                    : "Подтвердить данные"}
             </button>
           </form>
 

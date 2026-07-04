@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as pdfMake from "pdfmake/build/pdfmake";
@@ -174,7 +175,7 @@ export default function InvoicePage() {
   }
 
   return (
-    <div className="invoice-layout">
+    <><div className="invoice-layout">
       <div className="site-container">
         <div className="invoice-header">
           <div>
@@ -198,39 +199,6 @@ export default function InvoicePage() {
           <div className="whatsapp-required-banner">
             <AlertTriangle size={18} />
             <span>⚠️ Заказ будет обработан <strong>ТОЛЬКО</strong> после отправки в WhatsApp! Без отправки заказ не поступит в обработку.</span>
-          </div>
-        )}
-
-        {showWhatsAppPrompt && (
-          <div className="modal-overlay" onClick={() => setShowWhatsAppPrompt(false)}>
-            <div className="whatsapp-prompt-modal" onClick={(e) => e.stopPropagation()}>
-              <button className="modal-close" onClick={() => setShowWhatsAppPrompt(false)}>
-                <X size={20} />
-              </button>
-              <div className="whatsapp-prompt-icon">
-                <AlertTriangle size={40} />
-              </div>
-              <h2>Внимание!</h2>
-              <p className="whatsapp-prompt-text">
-                Заказ будет обработан <strong>только после отправки</strong> в WhatsApp.
-                Без отправки заказ <strong>не поступит в обработку</strong>.
-              </p>
-              <button
-                onClick={() => { sendToWhatsApp(); setShowWhatsAppPrompt(false); }}
-                className="btn btn-whatsapp"
-                style={{ width: "100%", justifyContent: "center" }}
-              >
-                <MessageCircle size={18} />
-                Отправить в WhatsApp
-              </button>
-              <button
-                onClick={() => setShowWhatsAppPrompt(false)}
-                className="btn btn-ghost"
-                style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
-              >
-                Отправить позже
-              </button>
-            </div>
           </div>
         )}
 
@@ -359,7 +327,40 @@ export default function InvoicePage() {
         </div>
       </div>
     </div>
-  );
+    {typeof document !== "undefined" && showWhatsAppPrompt && createPortal(
+      <div className="modal-overlay" onClick={() => setShowWhatsAppPrompt(false)}>
+        <div className="whatsapp-prompt-modal" onClick={(e) => e.stopPropagation()}>
+          <button className="modal-close" onClick={() => setShowWhatsAppPrompt(false)}>
+            <X size={20} />
+          </button>
+          <div className="whatsapp-prompt-icon">
+            <AlertTriangle size={40} />
+          </div>
+          <h2>Внимание!</h2>
+          <p className="whatsapp-prompt-text">
+            Заказ будет обработан <strong>только после отправки</strong> в WhatsApp.
+            Без отправки заказ <strong>не поступит в обработку</strong>.
+          </p>
+          <button
+            onClick={() => { sendToWhatsApp(); setShowWhatsAppPrompt(false); }}
+            className="btn btn-whatsapp"
+            style={{ width: "100%", justifyContent: "center" }}
+          >
+            <MessageCircle size={18} />
+            Отправить в WhatsApp
+          </button>
+          <button
+            onClick={() => setShowWhatsAppPrompt(false)}
+            className="btn btn-ghost"
+            style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
+          >
+            Отправить позже
+          </button>
+        </div>
+      </div>,
+      document.body
+    )}
+  </>);
 }
 
 function Info({ label, value }: { label: string; value: string }) {
