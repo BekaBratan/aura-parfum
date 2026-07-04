@@ -112,6 +112,10 @@ export default function CartPage() {
       }, 0),
     [items, restrictedCategories, lineByProductId, kztRate],
   );
+  const hasRestrictedItems = useMemo(
+    () => items.some((item) => restrictedCategories.has(item.category)),
+    [items, restrictedCategories],
+  );
 
   const refreshCartProducts = useCallback(
     async ({ showToast = false } = {}) => {
@@ -418,7 +422,7 @@ export default function CartPage() {
             </>
           ) : (
             <>
-              {restrictedTotal < MIN_ORDER_KZT && (
+              {hasRestrictedItems && restrictedTotal < MIN_ORDER_KZT && (
                 <div className="min-order-warning">
                   <div className="min-order-header">
                     <span>Минимальная сумма заказа (парфюм, масла, аксессуары)</span>
@@ -438,7 +442,7 @@ export default function CartPage() {
                   </div>
                 </div>
               )}
-              {restrictedTotal < MIN_ORDER_KZT ? (
+              {hasRestrictedItems && restrictedTotal < MIN_ORDER_KZT ? (
                 <button type="button" disabled className="btn btn-secondary cart-checkout">
                   Мин. сумма {formatKzt(MIN_ORDER_KZT)}
                 </button>
