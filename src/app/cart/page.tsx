@@ -50,7 +50,7 @@ function getCartStockWarnings(items: CartItem[]): CartStockWarning[] {
       ];
     }
 
-    if (availableCount < lowerBound) {
+    if (item.unit === "ml" && availableCount < lowerBound) {
       return [
         {
           productId: item.product_id,
@@ -326,7 +326,7 @@ export default function CartPage() {
                 <div className="cart-item-qty">
                   <QuantityControls
                     value={item.quantity}
-                    min={item.min_volume ?? 1}
+                    min={item.unit === "ml" ? (item.min_volume ?? 1) : 1}
                     max={availableCount || 1}
                     unit={item.unit ?? "pcs"}
                     onChange={(v) => updateQuantity(item.product_id, v)}

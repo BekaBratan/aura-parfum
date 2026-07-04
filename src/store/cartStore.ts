@@ -44,7 +44,7 @@ export const useCartStore = create<CartStore>()(
         if (availableCount <= 0) return;
 
         const initialQty = item.quantity ?? 1;
-        const lowerBound = item.min_volume ?? 1;
+        const lowerBound = item.unit === "ml" ? (item.min_volume ?? 1) : 1;
         const safeQty = Math.min(Math.max(lowerBound, initialQty), availableCount);
         if (safeQty < lowerBound) return;
 
@@ -76,7 +76,7 @@ export const useCartStore = create<CartStore>()(
         set({
           items: get().items.map((i) => {
             if (i.product_id !== productId) return i;
-            const lowerBound = i.min_volume ?? 1;
+            const lowerBound = i.unit === "ml" ? (i.min_volume ?? 1) : 1;
             const clamped = Math.min(Math.max(lowerBound, quantity), Number(i.count ?? 0));
             return { ...i, quantity: clamped };
           }),
