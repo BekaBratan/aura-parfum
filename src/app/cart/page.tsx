@@ -438,9 +438,15 @@ export default function CartPage() {
                   </div>
                 </div>
               )}
-              <Link href="/checkout" className="btn btn-primary cart-checkout">
-                Оформить заказ <ArrowRight size={16} />
-              </Link>
+              {restrictedTotal < MIN_ORDER_KZT ? (
+                <button type="button" disabled className="btn btn-secondary cart-checkout">
+                  Мин. сумма {formatKzt(MIN_ORDER_KZT)}
+                </button>
+              ) : (
+                <Link href="/checkout" className="btn btn-primary cart-checkout">
+                  Оформить заказ <ArrowRight size={16} />
+                </Link>
+              )}
             </>
           )}
           <button
