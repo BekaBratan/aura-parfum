@@ -388,9 +388,9 @@ export default function CheckoutPage() {
             <button
               type="submit"
               disabled={submitting || refreshingStock || Boolean(stockIssue)}
-              className={stockIssue ? "btn btn-primary" : "btn btn-whatsapp"}
+              className="btn btn-primary"
             >
-              {submitting ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
+              {submitting ? <Loader2 size={18} className="animate-spin" /> : null}
               {stockIssue
                 ? "Проверьте корзину перед оформлением"
                 : refreshingStock
