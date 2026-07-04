@@ -2130,82 +2130,21 @@ img {
   padding: 14px 18px;
   margin-bottom: 24px;
   border-radius: 10px;
-  background: rgba(255, 200, 0, 0.12);
-  border: 1px solid rgba(255, 200, 0, 0.35);
-  color: #facc15;
+  background: rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+  border-left: 4px solid #d97706;
+  color: #1a1a1a;
   font-size: 14px;
   line-height: 1.4;
 }
 
+.whatsapp-required-banner strong {
+  color: #92400e;
+  font-weight: 700;
+}
+
 .whatsapp-required-banner span {
   flex: 1;
-}
-
-.whatsapp-required-banner strong {
-  color: #fff;
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
-  padding: 20px;
-}
-
-.whatsapp-prompt-modal {
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 32px 28px 24px;
-  max-width: 400px;
-  width: 100%;
-  position: relative;
-  text-align: center;
-}
-
-.whatsapp-prompt-modal h2 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #facc15;
-  margin-bottom: 12px;
-}
-
-.whatsapp-prompt-text {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.8);
-  line-height: 1.5;
-  margin-bottom: 24px;
-}
-
-.whatsapp-prompt-text strong {
-  color: #fff;
-}
-
-.whatsapp-prompt-icon {
-  color: #facc15;
-  margin-bottom: 16px;
-}
-
-.modal-close {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  background: none;
-  border: none;
-  color: rgba(255, 255, 255, 0.4);
-  cursor: pointer;
-  padding: 4px;
-  line-height: 0;
-  transition: color 0.15s;
-}
-
-.modal-close:hover {
-  color: rgba(255, 255, 255, 0.8);
 }
 
 .cart-list {

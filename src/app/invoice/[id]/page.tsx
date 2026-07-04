@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as pdfMake from "pdfmake/build/pdfmake";
@@ -197,8 +196,8 @@ export default function InvoicePage() {
 
         {order.payment_status === "pending_payment" && order.order_status !== "cancelled" && (
           <div className="whatsapp-required-banner">
-            <AlertTriangle size={18} />
-            <span>⚠️ Заказ будет обработан <strong>ТОЛЬКО</strong> после отправки в WhatsApp! Без отправки заказ не поступит в обработку.</span>
+            <AlertTriangle size={18} style={{ color: "#d97706", flexShrink: 0 }} />
+            <span>Заказ будет обработан <strong>только после отправки</strong> в WhatsApp. Без отправки заказ не поступит в обработку.</span>
           </div>
         )}
 
@@ -327,17 +326,33 @@ export default function InvoicePage() {
         </div>
       </div>
     </div>
-    {typeof document !== "undefined" && showWhatsAppPrompt && createPortal(
-      <div className="modal-overlay" onClick={() => setShowWhatsAppPrompt(false)}>
-        <div className="whatsapp-prompt-modal" onClick={(e) => e.stopPropagation()}>
-          <button className="modal-close" onClick={() => setShowWhatsAppPrompt(false)}>
+    {showWhatsAppPrompt && (
+      <div onClick={() => setShowWhatsAppPrompt(false)}
+        style={{
+          position: "fixed", inset: 0, zIndex: 999,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)",
+          padding: 20
+        }}
+      >
+        <div onClick={(e) => e.stopPropagation()}
+          className="card"
+          style={{ maxWidth: 400, width: "100%", padding: "32px 28px 24px", textAlign: "center", position: "relative" }}
+        >
+          <button onClick={() => setShowWhatsAppPrompt(false)}
+            style={{
+              position: "absolute", top: 12, right: 12,
+              background: "none", border: "none", color: "var(--color-muted)",
+              cursor: "pointer", padding: 4, lineHeight: 0
+            }}
+          >
             <X size={20} />
           </button>
-          <div className="whatsapp-prompt-icon">
+          <div style={{ color: "var(--gold)", marginBottom: 16, display: "flex", justifyContent: "center" }}>
             <AlertTriangle size={40} />
           </div>
-          <h2>Внимание!</h2>
-          <p className="whatsapp-prompt-text">
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: "var(--gold)", marginBottom: 12 }}>Внимание!</h2>
+          <p style={{ fontSize: 15, color: "var(--color-text)", lineHeight: 1.5, marginBottom: 24 }}>
             Заказ будет обработан <strong>только после отправки</strong> в WhatsApp.
             Без отправки заказ <strong>не поступит в обработку</strong>.
           </p>
@@ -357,8 +372,7 @@ export default function InvoicePage() {
             Отправить позже
           </button>
         </div>
-      </div>,
-      document.body
+      </div>
     )}
   </>);
 }
