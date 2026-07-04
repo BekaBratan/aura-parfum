@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
-import { Product } from "@/types";
+import { Product, CartItem, ProductCategory } from "@/types";
 import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
 import { itemPriceKzt } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
@@ -16,7 +16,6 @@ import { Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import QuantityControls from "@/components/ui/QuantityControls";
 import { useCountryStore, getCountryCode } from "@/store/countryStore";
 import { GENDER_LABELS } from "@/lib/utils";
-import { CartItem } from "@/types";
 
 const CATEGORY_NAMES: Record<string, string> = {
   oil: "Масло",
@@ -116,6 +115,30 @@ export default function CartPage() {
     () => items.some((item) => restrictedCategories.has(item.category)),
     [items, restrictedCategories],
   );
+
+  const VARIETY_MIN = 3;
+  const varietyCategories = useMemo(() => new Set(["original", "analog"]), []);
+  const categoryVariety = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const item of items) {
+      if (!varietyCategories.has(item.category)) continue;
+      if (!map[item.category]) map[item.category] = new Set();
+      map[item.category].add(item.product_id);
+    }
+    return map;
+  }, [items, varietyCategories]);
+  const varietyWarnings = useMemo(
+    () => Object.entries(categoryVariety)
+      .filter(([, ids]) => ids.size < VARIETY_MIN)
+      .map(([cat, ids]) => ({
+        category: cat,
+        label: CATEGORY_NAMES[cat] || cat,
+        current: ids.size,
+        needed: VARIETY_MIN,
+      })),
+    [categoryVariety],
+  );
+  const hasVarietyIssue = varietyWarnings.length > 0;
 
   const refreshCartProducts = useCallback(
     async ({ showToast = false } = {}) => {
@@ -442,9 +465,14 @@ export default function CartPage() {
                   </div>
                 </div>
               )}
-              {hasRestrictedItems && restrictedTotal < MIN_ORDER_KZT ? (
+              {varietyWarnings.map((w) => (
+                <div key={w.category} className="variety-warning">
+                  <span>Минимум <strong>{w.needed} разных товаров</strong> в категории «{w.label}»: {w.current}/{w.needed}</span>
+                </div>
+              ))}
+              {hasRestrictedItems && restrictedTotal < MIN_ORDER_KZT || hasVarietyIssue ? (
                 <button type="button" disabled className="btn btn-secondary cart-checkout">
-                  Мин. сумма {formatKzt(MIN_ORDER_KZT)}
+                  {hasVarietyIssue ? `Нужно ${VARIETY_MIN} разных товаров` : `Мин. сумма ${formatKzt(MIN_ORDER_KZT)}`}
                 </button>
               ) : (
                 <Link href="/checkout" className="btn btn-primary cart-checkout">
