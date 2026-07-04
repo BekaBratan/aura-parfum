@@ -307,9 +307,9 @@ export default function CheckoutPage() {
 
       const fullOrder = orderData as Order | null;
 
-      clearCart();
       toast.success("Заказ создан!");
       router.push(`/invoice/${createdOrder.order_id}`);
+      setTimeout(() => clearCart(), 50);
     } catch {
       toast.error("Что-то пошло не так");
       setSubmitting(false);
