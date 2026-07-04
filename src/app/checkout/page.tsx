@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { ArrowLeft, Loader2, MessageCircle, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatPriceUsd, UNIT_LABELS, itemPriceKzt, isKztPriced, buildInvoiceWhatsAppText } from "@/lib/utils";
+import { formatPriceUsd, UNIT_LABELS, itemPriceKzt, isKztPriced } from "@/lib/utils";
 import { getOrderItemDetails } from "@/lib/orderItemDetails";
 import { useActiveDiscounts } from "@/lib/useDiscounts";
 import { calculateDiscounts } from "@/lib/discounts";
@@ -309,16 +309,6 @@ export default function CheckoutPage() {
 
       clearCart();
       toast.success("Заказ создан!");
-
-      if (fullOrder) {
-        const siteUrl = window.location.origin;
-        const message = buildInvoiceWhatsAppText(fullOrder, siteUrl, kztRate);
-        const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
-        if (number) {
-          window.open(`https://wa.me/${number.replace(/\D/g, "")}?text=${message}`, "_blank", "noopener,noreferrer");
-        }
-      }
-
       router.push(`/invoice/${createdOrder.order_id}`);
     } catch {
       toast.error("Что-то пошло не так");
@@ -406,8 +396,8 @@ export default function CheckoutPage() {
                 : refreshingStock
                   ? "Обновляем остатки..."
                   : submitting
-                    ? "Отправляем в WhatsApp..."
-                    : "Подтвердить и отправить в WhatsApp"}
+                    ? "Создаём заказ..."
+                    : "Подтвердить данные и отправить в WhatsApp"}
             </button>
           </form>
 

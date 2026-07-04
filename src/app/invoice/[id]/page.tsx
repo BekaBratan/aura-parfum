@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import * as pdfMake from "pdfmake/build/pdfmake";
 import pdfFonts from "pdfmake/build/vfs_fonts";
-import { Download, Loader2, MessageCircle, XCircle } from "lucide-react";
+import { AlertTriangle, Download, Loader2, MessageCircle, X, XCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { Order } from "@/types";
@@ -40,6 +40,7 @@ export default function InvoicePage() {
   const [loading, setLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState("");
   const [pdfGenerating, setPdfGenerating] = useState(false);
+  const [showWhatsAppPrompt, setShowWhatsAppPrompt] = useState(false);
   const kztRate = useCurrencyStore((s) => s.kztRate);
 
   useEffect(() => {
@@ -51,9 +52,13 @@ export default function InvoicePage() {
         .eq("id", params.id)
         .single();
 
-      setOrder((data as Order) || null);
+      const loaded = (data as Order) || null;
+      setOrder(loaded);
       setPdfUrl("");
       setLoading(false);
+      if (loaded && loaded.payment_status === "pending_payment" && loaded.order_status !== "cancelled") {
+        setShowWhatsAppPrompt(true);
+      }
     }
 
     loadOrder();
@@ -188,6 +193,46 @@ export default function InvoicePage() {
             </span>
           </div>
         </div>
+
+        {order.payment_status === "pending_payment" && order.order_status !== "cancelled" && (
+          <div className="whatsapp-required-banner">
+            <AlertTriangle size={18} />
+            <span>⚠️ Заказ будет обработан <strong>ТОЛЬКО</strong> после отправки в WhatsApp! Без отправки заказ не поступит в обработку.</span>
+          </div>
+        )}
+
+        {showWhatsAppPrompt && (
+          <div className="modal-overlay" onClick={() => setShowWhatsAppPrompt(false)}>
+            <div className="whatsapp-prompt-modal" onClick={(e) => e.stopPropagation()}>
+              <button className="modal-close" onClick={() => setShowWhatsAppPrompt(false)}>
+                <X size={20} />
+              </button>
+              <div className="whatsapp-prompt-icon">
+                <AlertTriangle size={40} />
+              </div>
+              <h2>Внимание!</h2>
+              <p className="whatsapp-prompt-text">
+                Заказ будет обработан <strong>только после отправки</strong> в WhatsApp.
+                Без отправки заказ <strong>не поступит в обработку</strong>.
+              </p>
+              <button
+                onClick={() => { sendToWhatsApp(); setShowWhatsAppPrompt(false); }}
+                className="btn btn-whatsapp"
+                style={{ width: "100%", justifyContent: "center" }}
+              >
+                <MessageCircle size={18} />
+                Отправить в WhatsApp
+              </button>
+              <button
+                onClick={() => setShowWhatsAppPrompt(false)}
+                className="btn btn-ghost"
+                style={{ width: "100%", justifyContent: "center", marginTop: 8 }}
+              >
+                Отправить позже
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="invoice-grid">
           <div className="card invoice-card">
