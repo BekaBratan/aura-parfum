@@ -467,12 +467,27 @@ export default function CartPage() {
               )}
               {varietyWarnings.map((w) => (
                 <div key={w.category} className="variety-warning">
-                  <span>Минимум <strong>{w.needed} разных товаров</strong> в категории «{w.label}»: {w.current}/{w.needed}</span>
+                  <div className="variety-header">
+                    <span>Категория «{w.label}» — минимум <strong>{w.needed} разных товаров</strong></span>
+                    <strong>{w.current}/{w.needed}</strong>
+                  </div>
+                  <div className="variety-bar-track">
+                    {Array.from({ length: w.needed }, (_, i) => (
+                      <div
+                        key={i}
+                        className={`variety-bar-segment${i < w.current ? " filled" : ""}`}
+                      />
+                    ))}
+                  </div>
                 </div>
               ))}
               {hasRestrictedItems && restrictedTotal < MIN_ORDER_KZT || hasVarietyIssue ? (
                 <button type="button" disabled className="btn btn-secondary cart-checkout">
-                  {hasVarietyIssue ? `Нужно ${VARIETY_MIN} разных товаров` : `Мин. сумма ${formatKzt(MIN_ORDER_KZT)}`}
+                  {hasRestrictedItems && restrictedTotal < MIN_ORDER_KZT && hasVarietyIssue
+                    ? "Не все условия соблюдены"
+                    : hasVarietyIssue
+                      ? `Нужно ${VARIETY_MIN} разных товаров`
+                      : `Мин. сумма ${formatKzt(MIN_ORDER_KZT)}`}
                 </button>
               ) : (
                 <Link href="/checkout" className="btn btn-primary cart-checkout">
