@@ -353,6 +353,7 @@ export default function CartPage() {
                     min={item.unit === "ml" ? (item.min_volume ?? 1) : 1}
                     max={availableCount || 1}
                     unit={item.unit ?? "pcs"}
+                    step={item.unit === "ml" && (item.min_volume ?? 1) >= 1000 ? (item.min_volume ?? 1) : 1}
                     onChange={(v) => updateQuantity(item.product_id, v)}
                     onLimitExceeded={() =>
                       toast.error(`Превышен лимит запаса: ${item.name}`, { id: "stock-limit" })

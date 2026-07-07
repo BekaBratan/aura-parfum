@@ -56,9 +56,10 @@ export default function ProductCard({
   const presetType = getPresetType(product.category, product.unit);
   const { presets } = usePresets(presetType ?? "");
 
+  const bigStepMl = isMl && minVolume >= 1000;
+
   const volumePriceInfo = useMemo(() => {
     if (!isInCart || !cartItem) return null;
-
     const qty = cartItem.quantity;
     const category = product.category ?? "oil";
     const unitPrice = priceUsd;
@@ -275,6 +276,7 @@ export default function ProductCard({
           min={isMl ? minVolume : 1}
           max={productCount}
           unit={product.unit ?? "pcs"}
+          step={bigStepMl ? minVolume : 1}
           onChange={(v) => updateQuantity(product.id, v)}
           onLimitExceeded={() => notifyLimit(product.name)}
           size="sm"
@@ -395,7 +397,7 @@ export default function ProductCard({
                       })}
                     </div>
                   )}
-                  {product.category === "accessory" && presets.length > 0 && (
+                  {product.category === "accessory" && !isMl && presets.length > 0 && (
                     <div className="product-card-volumes" onClick={stop}>
                       {presets.map((v) => {
                         const isTaken = v > productCount;
@@ -466,7 +468,7 @@ export default function ProductCard({
                   })}
                 </div>
               )}
-{product.category === "accessory" && presets.length > 0 && (
+{product.category === "accessory" && !isMl && presets.length > 0 && (
                   <div className="product-card-volumes" onClick={stop}>
                   {presets.map((v) => {
                     const isTaken = v > productCount;
