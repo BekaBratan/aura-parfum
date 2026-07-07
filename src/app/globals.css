@@ -986,7 +986,8 @@ img {
 }
 
 .qty-controls .qty-input {
-  width: 56px;
+  min-width: 56px;
+  width: auto;
   min-height: 34px;
   padding: 4px 6px;
   text-align: center;
@@ -1021,7 +1022,8 @@ img {
 }
 
 .qty-controls--sm .qty-input {
-  width: 44px;
+  min-width: 44px;
+  width: auto;
   min-height: 28px;
   font-size: 0.86rem;
 }
