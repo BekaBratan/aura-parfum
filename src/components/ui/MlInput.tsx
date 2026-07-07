@@ -73,7 +73,6 @@ export default function MlInput({
     <input
       type="text"
       inputMode="numeric"
-      size={Math.max(String(draft).length || 1, 4)}
       value={draft}
       onChange={(e) => handleChange(e.target.value)}
       onBlur={handleBlur}

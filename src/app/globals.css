@@ -1045,6 +1045,34 @@ img {
   justify-content: space-between;
 }
 
+@media (max-width: 600px) {
+  .card-cart-controls-wrap {
+    gap: 4px;
+  }
+  .qty-controls--sm {
+    gap: 1px;
+    padding: 2px;
+  }
+  .qty-controls--sm .qty-btn {
+    width: 22px;
+    height: 22px;
+  }
+  .qty-controls--sm .qty-input {
+    min-width: 32px;
+    width: 36px;
+    padding: 2px 3px;
+    font-size: 0.78rem;
+  }
+  .qty-controls--sm .qty-unit {
+    font-size: 0.65rem;
+    padding-right: 2px;
+  }
+  .card-cart-remove {
+    width: 22px;
+    height: 22px;
+  }
+}
+
 .card-cart-remove {
   flex-shrink: 0;
   width: 34px;
