@@ -868,6 +868,10 @@ img {
   margin-bottom: 6px;
 }
 
+.product-card-volumes .volume-pill:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .volume-pill {
   display: flex;
   width: 100%;
@@ -986,8 +990,7 @@ img {
 }
 
 .qty-controls .qty-input {
-  min-width: 56px;
-  width: auto;
+  width: 72px;
   min-height: 34px;
   padding: 4px 6px;
   text-align: center;
@@ -1022,8 +1025,7 @@ img {
 }
 
 .qty-controls--sm .qty-input {
-  min-width: 44px;
-  width: auto;
+  width: 60px;
   min-height: 28px;
   font-size: 0.86rem;
 }
