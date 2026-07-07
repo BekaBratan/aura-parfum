@@ -101,21 +101,6 @@ export default function CartPage() {
   );
 
   const MIN_ORDER_KZT = 30000;
-  const restrictedCategories = useMemo(() => new Set(["oil", "perfume", "accessory"]), []);
-  const restrictedTotal = useMemo(
-    () => items
-      .filter((item) => restrictedCategories.has(item.category))
-      .reduce((sum, item) => {
-        const line = lineByProductId.get(item.product_id);
-        return sum + (line ? line.finalKzt : itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity);
-      }, 0),
-    [items, restrictedCategories, lineByProductId, kztRate],
-  );
-  const hasRestrictedItems = useMemo(
-    () => items.some((item) => restrictedCategories.has(item.category)),
-    [items, restrictedCategories],
-  );
-
   const VARIETY_MIN = 3;
   const varietyCategories = useMemo(() => new Set(["original", "analog"]), []);
   const categoryVariety = useMemo(() => {
@@ -445,26 +430,6 @@ export default function CartPage() {
             </>
           ) : (
             <>
-              {hasRestrictedItems && restrictedTotal < MIN_ORDER_KZT && (
-                <div className="min-order-warning">
-                  <div className="min-order-header">
-                    <span>Минимальная сумма заказа (парфюм, масла, аксессуары)</span>
-                    <strong>{formatKzt(MIN_ORDER_KZT)}</strong>
-                  </div>
-                  <div className="min-order-bar-track">
-                    <div
-                      className="min-order-bar-fill"
-                      style={{ width: `${Math.min(100, (restrictedTotal / MIN_ORDER_KZT) * 100)}%` }}
-                    />
-                  </div>
-                  <div className="min-order-footer">
-                    <span>{formatKzt(restrictedTotal)}</span>
-                    <span className={restrictedTotal >= MIN_ORDER_KZT ? "text-green-400" : "text-red-400"}>
-                      {restrictedTotal >= MIN_ORDER_KZT ? "✅" : `Ещё ${formatKzt(MIN_ORDER_KZT - restrictedTotal)}`}
-                    </span>
-                  </div>
-                </div>
-              )}
               {varietyWarnings.map((w) => (
                 <div key={w.category} className="variety-warning">
                   <div className="variety-header">
@@ -481,13 +446,9 @@ export default function CartPage() {
                   </div>
                 </div>
               ))}
-              {hasRestrictedItems && restrictedTotal < MIN_ORDER_KZT || hasVarietyIssue ? (
+              {hasVarietyIssue ? (
                 <button type="button" disabled className="btn btn-secondary cart-checkout">
-                  {hasRestrictedItems && restrictedTotal < MIN_ORDER_KZT && hasVarietyIssue
-                    ? "Не все условия соблюдены"
-                    : hasVarietyIssue
-                      ? `Нужно ${VARIETY_MIN} разных товаров`
-                      : `Мин. сумма ${formatKzt(MIN_ORDER_KZT)}`}
+                  Нужно {VARIETY_MIN} разных товаров
                 </button>
               ) : (
                 <Link href="/checkout" className="btn btn-primary cart-checkout">
