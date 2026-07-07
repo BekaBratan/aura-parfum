@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { createClient } from "@/lib/supabase/client";
 import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
-import { Product, CartItem, ProductCategory } from "@/types";
+import { Product, CartItem } from "@/types";
 import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
 import { itemPriceKzt } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
@@ -101,30 +101,6 @@ export default function CartPage() {
   );
 
   const MIN_ORDER_KZT = 30000;
-  const VARIETY_MIN = 3;
-  const varietyCategories = useMemo(() => new Set(["original", "analog"]), []);
-  const categoryVariety = useMemo(() => {
-    const map: Record<string, Set<string>> = {};
-    for (const item of items) {
-      if (!varietyCategories.has(item.category)) continue;
-      if (!map[item.category]) map[item.category] = new Set();
-      map[item.category].add(item.product_id);
-    }
-    return map;
-  }, [items, varietyCategories]);
-  const varietyWarnings = useMemo(
-    () => Object.entries(categoryVariety)
-      .filter(([, ids]) => ids.size < VARIETY_MIN)
-      .map(([cat, ids]) => ({
-        category: cat,
-        label: CATEGORY_NAMES[cat] || cat,
-        current: ids.size,
-        needed: VARIETY_MIN,
-      })),
-    [categoryVariety],
-  );
-  const hasVarietyIssue = varietyWarnings.length > 0;
-
   const refreshCartProducts = useCallback(
     async ({ showToast = false } = {}) => {
       const currentItems = useCartStore.getState().items;
@@ -431,31 +407,9 @@ export default function CartPage() {
             </>
           ) : (
             <>
-              {varietyWarnings.map((w) => (
-                <div key={w.category} className="variety-warning">
-                  <div className="variety-header">
-                    <span>Категория «{w.label}» — минимум <strong>{w.needed} разных товаров</strong></span>
-                    <strong>{w.current}/{w.needed}</strong>
-                  </div>
-                  <div className="variety-bar-track">
-                    {Array.from({ length: w.needed }, (_, i) => (
-                      <div
-                        key={i}
-                        className={`variety-bar-segment${i < w.current ? " filled" : ""}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
-              {hasVarietyIssue ? (
-                <button type="button" disabled className="btn btn-secondary cart-checkout">
-                  Нужно {VARIETY_MIN} разных товаров
-                </button>
-              ) : (
-                <Link href="/checkout" className="btn btn-primary cart-checkout">
-                  Оформить заказ <ArrowRight size={16} />
-                </Link>
-              )}
+              <Link href="/checkout" className="btn btn-primary cart-checkout">
+                Оформить заказ <ArrowRight size={16} />
+              </Link>
             </>
           )}
           <button

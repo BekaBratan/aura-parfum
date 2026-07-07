@@ -2413,46 +2413,6 @@ img {
   color: #22c55e;
 }
 
-.variety-warning {
-  margin-top: 16px;
-  padding: 14px;
-  border-radius: 10px;
-  background: rgba(217, 119, 6, 0.08);
-  border: 1px solid rgba(217, 119, 6, 0.2);
-  font-size: 13px;
-  color: var(--color-text);
-  line-height: 1.4;
-}
-
-.variety-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.variety-header strong:last-child {
-  color: #d97706;
-  font-weight: 600;
-}
-
-.variety-bar-track {
-  display: flex;
-  gap: 4px;
-  height: 6px;
-}
-
-.variety-bar-segment {
-  flex: 1;
-  border-radius: 3px;
-  background: rgba(217, 119, 6, 0.12);
-  transition: background 0.2s;
-}
-
-.variety-bar-segment.filled {
-  background: #d97706;
-}
-
 .checkout-grid,
 .invoice-grid {
   display: grid;
