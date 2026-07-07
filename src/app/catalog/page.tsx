@@ -146,6 +146,7 @@ function CatalogContent() {
       category: activeCategory,
       search: rawSearch,
     }));
+    setPage(1);
   }, [activeCategory, rawSearch]);
 
   const createQueryString = useCallback(
