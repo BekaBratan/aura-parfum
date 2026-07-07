@@ -201,7 +201,9 @@ export default function ProductCard({
   };
 
   const priceDisplay = isMl
-    ? formatPricePerUnit(priceUsd, "ml", kztRate)
+    ? isKztPriced(product.category)
+      ? `${formatKzt(priceUsd)} / мл`
+      : formatPricePerUnit(priceUsd, "ml", kztRate)
     : isKztPriced(product.category)
     ? formatKzt(priceUsd)
     : formatPriceUsd(priceUsd, kztRate);
@@ -220,7 +222,9 @@ export default function ProductCard({
     if (!volumePriceInfo) return <p className="price">{priceDisplay}</p>;
 
     const oldDisplay = isMl
-      ? formatPricePerUnit(priceUsd, "ml", kztRate)
+      ? isKztPriced(product.category)
+        ? `${formatKzt(priceUsd)} / мл`
+        : formatPricePerUnit(priceUsd, "ml", kztRate)
       : isKztPriced(product.category)
         ? formatKzt(priceUsd)
         : formatPriceUsd(priceUsd, kztRate);
