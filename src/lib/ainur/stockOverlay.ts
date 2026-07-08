@@ -40,7 +40,7 @@ export function applyStockOverlay(products: Product[], stockMap: StockMap): Prod
       return { ...p, count: stockMap.byId[p.ainur_id] };
     }
     const key = normalizeProductName(p.name);
-    if (key && key in stockMap.byName) {
+    if (p.ainur_id && key && key in stockMap.byName) {
       return { ...p, count: stockMap.byName[key] };
     }
     if (p.ainur_id) {
