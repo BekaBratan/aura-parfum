@@ -124,6 +124,7 @@ export interface AinurSaleProduct {
   discount_percent: number;
   unit: string;
   barcode?: string | null;
+  price?: number;
 }
 
 export interface AinurSalePaymentDetails {

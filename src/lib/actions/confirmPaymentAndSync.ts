@@ -37,14 +37,24 @@ export async function confirmPaymentAndSync(
   const storeId = process.env.AINUR_STORE_ID || DEFAULT_STORE_ID;
   const customerId = process.env.AINUR_CUSTOMER_ID || "";
 
+  const totalKzt = Number(typed.total_display_currency ?? 0);
+  const totalUsd = Number(typed.total_usd ?? 0);
+  const kztRate = totalUsd > 0 ? totalKzt / totalUsd : 0;
+
   const ainurItems = typed.items
     .filter((item) => item.ainur_id)
-    .map((item) => ({
-      product_id: item.ainur_id!,
-      quantity: item.quantity,
-      discount_percent: 0,
-      unit: item.unit === "ml" ? "ml" : "pcs",
-    }));
+    .map((item) => {
+      const unitPriceKzt = kztRate > 0 ? Math.round(item.price_usd * kztRate) : 0;
+      const lineDiscount = Number(item.discount_kzt ?? 0);
+      const discountPerUnit = lineDiscount > 0 && item.quantity > 0 ? Math.round(lineDiscount / item.quantity) : 0;
+      return {
+        product_id: item.ainur_id!,
+        quantity: item.quantity,
+        discount_percent: 0,
+        unit: item.unit === "ml" ? "ml" : "pcs",
+        price: unitPriceKzt - discountPerUnit,
+      };
+    });
 
   if (ainurItems.length === 0) {
     return { error: "В заказе нет товаров, привязанных к AinurPOS" };
