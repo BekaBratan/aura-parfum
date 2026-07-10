@@ -44,9 +44,9 @@ export async function confirmPaymentAndSync(
   const ainurItems = typed.items
     .filter((item) => item.ainur_id)
     .map((item) => {
-      const unitPriceKzt = kztRate > 0 ? Math.round(item.price_usd * kztRate) : 0;
+      const unitPriceKzt = kztRate > 0 ? item.price_usd * kztRate : 0;
       const lineDiscount = Number(item.discount_kzt ?? 0);
-      const discountPerUnit = lineDiscount > 0 && item.quantity > 0 ? Math.round(lineDiscount / item.quantity) : 0;
+      const discountPerUnit = lineDiscount > 0 && item.quantity > 0 ? Math.round(lineDiscount / item.quantity * 100) / 100 : 0;
       return {
         product_id: item.ainur_id!,
         quantity: item.quantity,

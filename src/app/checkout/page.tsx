@@ -263,7 +263,7 @@ export default function CheckoutPage() {
           volume_ml: item.volume_ml,
           image_url: item.image_url,
           ainur_id: item.ainur_id ?? null,
-          discount_kzt: line && line.discountKzt > 0 ? Math.round(line.discountKzt) : null,
+          discount_kzt: line && line.discountKzt > 0 ? Math.round(line.discountKzt * 100) / 100 : null,
           applied_discount_name: line && line.discountKzt > 0 ? ruleName : null,
         };
       });

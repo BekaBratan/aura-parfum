@@ -126,14 +126,14 @@ function calcDiscountAmount(d: Discount, baseKzt: number, kztRate: number): numb
   if (baseKzt <= 0) return 0;
   if (d.discount_type === "percentage") {
     const pct = Math.min(100, Math.max(0, d.discount_value));
-    return Math.round(baseKzt * (pct / 100));
+    return Math.round(baseKzt * (pct / 100) * 100) / 100;
   }
   // fixed: amount is stored in `currency_code`. Convert USD-denominated rules
   // to KZT at the current rate so we can subtract from a KZT line subtotal.
   const valueKzt = d.currency_code === "USD"
     ? d.discount_value * kztRate
     : d.discount_value;
-  return Math.min(Math.round(valueKzt), baseKzt);
+  return Math.min(Math.round(valueKzt * 100) / 100, baseKzt);
 }
 
 // ─── Public engine ─────────────────────────────────────────────────────────
@@ -247,7 +247,7 @@ export function calculateDiscounts(
       });
     }
   }
-  for (const snap of byRule.values()) snap.amount_kzt = Math.round(snap.amount_kzt);
+  for (const snap of byRule.values()) snap.amount_kzt = Math.round(snap.amount_kzt * 100) / 100;
 
   const discountKzt = lines.reduce((s, l) => s + l.discountKzt, 0);
   return {
@@ -270,7 +270,7 @@ export function describeDiscountValue(
 ): string {
   if (d.discount_type === "percentage") return `${d.discount_value}%`;
   const unit = d.currency_code === "KZT" ? "₸" : "$";
-  return `${Math.round(d.discount_value).toLocaleString("ru-RU")} ${unit}`;
+  return `${(Math.round(d.discount_value * 100) / 100).toLocaleString("ru-RU")} ${unit}`;
 }
 
 export function describeDiscountTrigger(
@@ -281,7 +281,7 @@ export function describeDiscountTrigger(
 ): string {
   const amount = (n: number | null | undefined) => {
     if (n == null) return null;
-    const formatted = Math.round(n).toLocaleString("ru-RU");
+    const formatted = (Math.round(n * 100) / 100).toLocaleString("ru-RU");
     return d.currency_code === "KZT" ? `${formatted} ₸` : `$${formatted}`;
   };
 

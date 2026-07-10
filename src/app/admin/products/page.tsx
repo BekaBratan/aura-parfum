@@ -397,9 +397,7 @@ export default function AdminProducts() {
       name: product.name,
       brand: product.brand,
       description: product.description || "",
-      price: editKzt
-        ? String(Math.round(Number(product.price_usd)))
-        : String(product.price_usd ?? ""),
+      price: String(product.price_usd ?? ""),
       category: product.category ?? "perfume",
       volume_ml: product.volume_ml === null ? "" : String(product.volume_ml),
       min_volume: product.min_volume === null ? "" : String(product.min_volume),
@@ -440,7 +438,7 @@ export default function AdminProducts() {
       // Prefill name/code/price/count for new products if the operator hasn't typed anything yet
       name: prev.name || a.name,
       code: prev.code || a.code,
-      price: prev.price || (isKztPriced(prev.category) ? String(Math.round(a.price)) : prev.price),
+      price: prev.price || (isKztPriced(prev.category) ? String(a.price) : prev.price),
       count: prev.count || String(a.stock),
     }));
     setAinurPickerOpen(false);
