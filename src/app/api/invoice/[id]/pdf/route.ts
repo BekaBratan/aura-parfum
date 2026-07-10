@@ -22,13 +22,7 @@ export async function GET(
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
-  const { data: rate } = await supabase
-    .from("currency_rates")
-    .select("rate_to_usd")
-    .eq("currency_code", "KZT")
-    .single();
-
-  const kztRate = (rate as { rate_to_usd: number } | null)?.rate_to_usd ?? 460;
+  const kztRate = (order as { kzt_rate?: number | null }).kzt_rate ?? 460;
 
   const { buildInvoicePdfDefinition } = await import("@/lib/pdf");
   const docDef = buildInvoicePdfDefinition(order as any, kztRate);

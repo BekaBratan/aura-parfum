@@ -42,6 +42,7 @@ export default function InvoicePage() {
   const [pdfGenerating, setPdfGenerating] = useState(false);
   const [showWhatsAppPrompt, setShowWhatsAppPrompt] = useState(false);
   const kztRate = useCurrencyStore((s) => s.kztRate);
+  const effectiveRate = order?.kzt_rate ?? kztRate;
 
   useEffect(() => {
     async function loadOrder() {
@@ -71,7 +72,7 @@ export default function InvoicePage() {
       setPdfGenerating(true);
 
       try {
-        const blob = await createInvoicePdfBlob(order, kztRate);
+        const blob = await createInvoicePdfBlob(order, order.kzt_rate ?? kztRate);
         const supabase = createClient();
         const path = getInvoicePdfPath(order);
         const { error: uploadError } = await supabase.storage
@@ -148,7 +149,7 @@ export default function InvoicePage() {
 
     const siteUrl = window.location.origin;
     const number = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "";
-    const message = buildInvoiceWhatsAppText(order, siteUrl, kztRate);
+    const message = buildInvoiceWhatsAppText(order, siteUrl, order.kzt_rate ?? kztRate);
     window.open(`https://wa.me/${number}?text=${message}`, "_blank", "noopener,noreferrer");
   };
 
@@ -206,7 +207,7 @@ export default function InvoicePage() {
             <h2 className="filter-title">Товары</h2>
             <div className="invoice-items">
               {order.items.map((item, index) => {
-                const priceKzt = itemKzt(item.price_usd, item.category, kztRate);
+                const priceKzt = itemKzt(item.price_usd, item.category, effectiveRate);
                 const details = getOrderItemDetails(item);
                 const baseKzt = priceKzt * item.quantity;
                 const discountKzt = Number(item.discount_kzt ?? 0);
@@ -252,7 +253,7 @@ export default function InvoicePage() {
               })}
             </div>
             {(() => {
-              const subtotal = order.items.reduce((s, i) => s + itemKzt(i.price_usd, i.category, kztRate) * i.quantity, 0);
+              const subtotal = order.items.reduce((s, i) => s + itemKzt(i.price_usd, i.category, effectiveRate) * i.quantity, 0);
               const discountKzt = Number(order.discount_kzt ?? 0);
               const total = Math.max(0, subtotal - discountKzt);
               return discountKzt > 0 ? (

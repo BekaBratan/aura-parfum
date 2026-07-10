@@ -60,6 +60,7 @@ export interface Order {
   total_display_currency: number | null;
   discount_kzt?: number | null;
   applied_discounts?: AppliedDiscountLine[] | null;
+  kzt_rate?: number;
   created_at: string;
 }
 
