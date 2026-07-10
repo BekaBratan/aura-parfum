@@ -216,13 +216,10 @@ export default function AdminProducts() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [ainurPickerOpen, setAinurPickerOpen] = useState(false);
   const [ainurStockById, setAinurStockById] = useState<Record<string, number>>({});
-  const [lockedById, setLockedById] = useState<Record<string, number>>({});
-
   // ─── Filter state ──────────────────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState<ProductCategory | "all">("all");
   const [filterStock, setFilterStock] = useState<"all" | "in" | "out">("all");
-  const [filterPending, setFilterPending] = useState<"all" | "has" | "none">("all");
   const [filterQuality, setFilterQuality] = useState<"all" | "deluxe" | "premium">("all");
   const [filterAccessoryType, setFilterAccessoryType] = useState<string>("all");
   const [filterGender, setFilterGender] = useState<string>("all");
@@ -280,15 +277,12 @@ export default function AdminProducts() {
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       if (filterCategory !== "all" && p.category !== filterCategory) return false;
-      // Stock filter uses the available count (Ainur - locked, or Supabase for local)
+      // Stock filter uses display count (raw Ainur or Supabase)
       const linkedAinurId = p.ainur_id ?? null;
       const rawAinur = linkedAinurId && linkedAinurId in ainurStockById ? ainurStockById[linkedAinurId] : null;
-      const locked = linkedAinurId && rawAinur !== null ? (lockedById[linkedAinurId] ?? 0) : 0;
-      const effectiveCount = rawAinur !== null ? Math.max(0, rawAinur - locked) : Number(p.count ?? 0);
-      if (filterStock === "in" && effectiveCount === 0) return false;
-      if (filterStock === "out" && effectiveCount > 0) return false;
-      if (filterPending === "has" && locked === 0) return false;
-      if (filterPending === "none" && locked > 0) return false;
+      const displayCount = rawAinur !== null ? rawAinur : Number(p.count ?? 0);
+      if (filterStock === "in" && displayCount === 0) return false;
+      if (filterStock === "out" && displayCount > 0) return false;
       if (filterCategory !== "accessory") {
         if (filterQuality === "deluxe" && p.attributes?.quality !== "De Luxe") return false;
         if (filterQuality === "premium" && p.attributes?.quality !== "Premium") return false;
@@ -320,7 +314,7 @@ export default function AdminProducts() {
       }
       return true;
     });
-  }, [products, search, filterCategory, filterStock, filterPending, filterQuality, filterAccessoryType, filterGender, filterCountry, filterFeatured, filterAinurLink, ainurStockById, lockedById]);
+  }, [products, search, filterCategory, filterStock, filterQuality, filterAccessoryType, filterGender, filterCountry, filterFeatured, filterAinurLink, ainurStockById]);
 
   const supabase = createClient();
   const imagePreviewSrc = selectedImagePreviewUrl || form.image_url.trim();
@@ -364,13 +358,6 @@ export default function AdminProducts() {
       const map: Record<string, number> = {};
       for (const p of json.data) map[p.id] = p.stock;
       setAinurStockById(map);
-    }).catch(() => {});
-
-    // Pull locked quantities per ainur_id from pending-payment orders
-    fetch("/api/admin/stock-locks").then(async (r) => {
-      if (!r.ok) return;
-      const json = await r.json() as { locked?: Record<string, number> };
-      if (json.locked) setLockedById(json.locked);
     }).catch(() => {});
   }, []);
 
@@ -727,12 +714,6 @@ export default function AdminProducts() {
           </p>
         </div>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--dark-2)] p-3">
-          <p className="text-xs text-[var(--text-secondary)]">В ожидании оплаты</p>
-          <p className="text-xl font-bold text-amber-400 mt-1">
-            {Object.values(lockedById).reduce((s, n) => s + n, 0).toLocaleString("ru-RU")}
-          </p>
-        </div>
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--dark-2)] p-3">
           <p className="text-xs text-[var(--text-secondary)]">Товаров в Ainur</p>
           <p className="text-xl font-bold text-[var(--text-primary)] mt-1">
             {Object.keys(ainurStockById).length}
@@ -846,20 +827,6 @@ export default function AdminProducts() {
               {([["all", "Все"], ["in", "В наличии"], ["out", "Нет"]] as const).map(([val, label]) => (
                 <button key={val} onClick={() => setFilterStock(val)}
                   className={`admin-filter-pill${filterStock === val ? " is-active" : ""}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="admin-filter-divider" />
-
-          <div className="admin-filter-group">
-            <span className="admin-filter-label">В ожидании</span>
-            <div className="admin-filter-pills">
-              {([["all", "Все"], ["has", "Есть"], ["none", "Нет"]] as const).map(([val, label]) => (
-                <button key={val} onClick={() => setFilterPending(val)}
-                  className={`admin-filter-pill${filterPending === val ? " is-active" : ""}`}>
                   {label}
                 </button>
               ))}
@@ -984,8 +951,6 @@ export default function AdminProducts() {
                 <th className="pb-3 pr-4 hidden lg:table-cell">Тип</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Цена</th>
                 <th className="pb-3 pr-4 hidden md:table-cell">Наличие</th>
-                <th className="pb-3 pr-4 hidden lg:table-cell">В ожидании</th>
-                <th className="pb-3 pr-4 hidden lg:table-cell">Доступно</th>
                 {isAdmin && <th className="pb-3 text-right">Действия</th>}
               </tr>
             </thead>
@@ -997,8 +962,6 @@ export default function AdminProducts() {
                   ? ainurStockById[linkedAinurId]
                   : null;
                 const isLinked = ainurCount !== null;
-                const lockedQty = isLinked ? (lockedById[linkedAinurId!] ?? 0) : 0;
-                const availableCount = isLinked ? Math.max(0, ainurCount! - lockedQty) : supabaseCount;
                 const displayCount = isLinked ? ainurCount! : supabaseCount;
                 const isAvailable = displayCount > 0;
                 const stockBadgeClass = isLinked
@@ -1053,26 +1016,12 @@ export default function AdminProducts() {
                         className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${stockBadgeClass}`}
                         title={
                           isLinked
-                            ? `Ainur: ${ainurCount}, В ожидании: ${lockedQty}, Доступно: ${availableCount}`
+                            ? `Ainur: ${ainurCount}`
                             : `Остаток из Supabase: ${supabaseCount}`
                         }
                       >
                         {isLinked && <Link2 size={11} />}
                         {isAvailable ? `${displayCount} ${UNIT_LABELS[unit]}` : "Нет в наличии"}
-                      </span>
-                    </td>
-                    <td className="py-3 pr-4 hidden lg:table-cell">
-                      {isLinked ? (
-                        <span className="text-xs text-[var(--text-secondary)]">
-                          {lockedQty > 0 ? `${lockedQty} ${UNIT_LABELS[unit]}` : "—"}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-[var(--text-secondary)]">—</span>
-                      )}
-                    </td>
-                    <td className="py-3 pr-4 hidden lg:table-cell">
-                      <span className={`text-xs font-medium ${isLinked && availableCount < 5 ? "text-red-400" : isLinked ? "text-green-400" : "text-[var(--text-secondary)]"}`}>
-                        {isLinked ? `${availableCount} ${UNIT_LABELS[unit]}` : "—"}
                       </span>
                     </td>
                     {isAdmin && (
