@@ -272,7 +272,7 @@ export default function AdminOrders() {
                       <p className="text-xs text-[var(--text-secondary)]">{order.customer_name}</p>
                     </td>
                     <td className="py-2 pr-3 text-[var(--text-secondary)] hidden sm:table-cell">{order.customer_phone}</td>
-                    <td className="py-2 pr-3 text-[var(--gold)] hidden md:table-cell whitespace-nowrap">{formatPrice(orderTotalKzt(order.items, kztRate))}</td>
+                    <td className="py-2 pr-3 text-[var(--gold)] hidden md:table-cell whitespace-nowrap">{formatPrice(orderTotalKzt(order.items, order.kzt_rate ?? kztRate))}</td>
                     <td className="py-2 pr-3">
                       <StatusSelect
                         value={status.key}
@@ -355,14 +355,14 @@ export default function AdminOrders() {
                         </div>
                         <p className="text-xs text-[var(--text-secondary)] mt-1">{unitLabel}</p>
                       </div>
-                      <span className="text-[var(--text-primary)] whitespace-nowrap font-semibold">{formatPrice(itemKzt(item, kztRate) * item.quantity)}</span>
+                      <span className="text-[var(--text-primary)] whitespace-nowrap font-semibold">{formatPrice(itemKzt(item, detail.kzt_rate ?? kztRate) * item.quantity)}</span>
                     </div>
                   );
                 })}
               </div>
 
               {(() => {
-                const subtotal = orderTotalKzt(detail.items, kztRate);
+                const subtotal = orderTotalKzt(detail.items, detail.kzt_rate ?? kztRate);
                 const discountKzt = Number(detail.discount_kzt ?? 0);
                 const total = Math.max(0, subtotal - discountKzt);
                 return (

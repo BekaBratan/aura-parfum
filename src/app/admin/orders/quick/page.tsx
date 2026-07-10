@@ -240,7 +240,7 @@ export default function QuickOrderActions() {
                     </p>
                   </div>
                   <span className="text-sm text-[var(--gold)] font-medium ml-3 shrink-0">
-                    {formatPrice(itemKzt(item, kztRate) * item.quantity)}
+                    {formatPrice(itemKzt(item, selected.kzt_rate ?? kztRate) * item.quantity)}
                   </span>
                 </div>
               ))}
@@ -251,7 +251,7 @@ export default function QuickOrderActions() {
           <div className="px-4 py-3 border-b border-[var(--border)]">
             <div className="flex justify-between items-center">
               <span className="text-sm font-semibold text-[var(--text-primary)]">Итого</span>
-              <span className="text-lg font-bold text-gold-gradient">{formatPrice(orderTotalKzt(selected.items, kztRate))}</span>
+              <span className="text-lg font-bold text-gold-gradient">{formatPrice(orderTotalKzt(selected.items, selected.kzt_rate ?? kztRate))}</span>
             </div>
           </div>
 
