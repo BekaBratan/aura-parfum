@@ -16,6 +16,8 @@ import { CartProductSnapshot, useCartStore } from "@/store/cartStore";
 import { CartItem, Order, Product } from "@/types";
 import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay";
 import { validateAinurStock } from "@/lib/actions/validateAinurStock";
+import { createOrderCheckout } from "@/lib/actions/createOrderCheckout";
+import { useClientDiscount } from "@/lib/useClientDiscount";
 
 type StockIssue = {
   item: CartItem;
@@ -158,6 +160,19 @@ export default function CheckoutPage() {
     [discountResult.applied],
   );
 
+  // Personal client discount — display only. Mirrors the server's GREATEST
+  // logic: only the more advantageous of the rule discount and the personal
+  // discount is applied; the server is the source of truth for the totals.
+  const clientDiscount = useClientDiscount();
+  const personalDiscountKzt = useMemo(() => {
+    if (clientDiscount.discountPercent <= 0) return 0;
+    return Math.round(discountResult.totalKzt * clientDiscount.discountPercent / 100 * 100) / 100;
+  }, [clientDiscount.discountPercent, discountResult.totalKzt]);
+  const personalWins = personalDiscountKzt > discountResult.discountKzt;
+  const summaryTotalKzt = personalWins
+    ? Math.max(0, discountResult.totalKzt - personalDiscountKzt)
+    : discountResult.totalKzt;
+
   if (!mounted) return null;
 
   if (items.length === 0) {
@@ -268,47 +283,39 @@ export default function CheckoutPage() {
         };
       });
 
-      const supabase = createClient();
-      const { data, error } = await supabase.rpc("create_order_with_stock_check", {
-        p_customer_name: form.customer_name,
-        p_customer_phone: form.customer_phone,
-        p_customer_city: form.customer_city,
-        p_customer_address: form.customer_address,
-        p_comment: form.comment || null,
-        p_items: orderItems,
-        p_currency_code: "KZT",
-        p_rate_to_usd: kztRate,
-        p_discount_kzt: freshDiscount.discountKzt,
-        p_applied_discounts: freshDiscount.applied,
+      const result = await createOrderCheckout({
+        customer_name: form.customer_name,
+        customer_phone: form.customer_phone,
+        customer_city: form.customer_city,
+        customer_address: form.customer_address,
+        comment: form.comment || null,
+        kztRate,
+        discountKzt: freshDiscount.discountKzt,
+        appliedDiscounts: freshDiscount.applied,
+        items: orderItems,
       });
 
-      if (error) {
-        console.error(error);
+      if (!result.ok) {
+        toast.error(result.error || "Не удалось создать заказ");
         await refreshCartProducts();
-        toast.error(error.message || "Не удалось создать заказ");
         setSubmitting(false);
         return;
       }
 
-      const createdOrder = Array.isArray(data) ? data[0] : data;
-
-      if (!createdOrder?.order_id) {
-        toast.error("Не удалось создать заказ");
-        setSubmitting(false);
-        return;
-      }
+      const createdOrderId = result.orderId;
 
       // Fetch full order for WhatsApp message
+      const supabase = createClient();
       const { data: orderData } = await supabase
         .from("orders")
         .select("*")
-        .eq("id", createdOrder.order_id)
+        .eq("id", createdOrderId)
         .single();
 
       const fullOrder = orderData as Order | null;
 
       toast.success("Заказ создан!");
-      router.push(`/invoice/${createdOrder.order_id}`);
+      router.push(`/invoice/${createdOrderId}`);
       setTimeout(() => clearCart(), 50);
     } catch {
       toast.error("Что-то пошло не так");
@@ -412,7 +419,7 @@ export default function CheckoutPage() {
                 const ruleName = line?.appliedDiscountId
                   ? ruleNameById.get(line.appliedDiscountId)
                   : null;
-                const hasDiscount = line && line.discountKzt > 0;
+                const hasDiscount = line && line.discountKzt > 0 && !personalWins;
                 return (
                   <div key={item.product_id} className="order-item">
                     <div className="order-item-main">
@@ -453,7 +460,7 @@ export default function CheckoutPage() {
                 );
               })}
             </div>
-            {discountResult.discountKzt > 0 && (
+            {discountResult.discountKzt > 0 && !personalWins && (
               <>
                 <div className="summary-row text-[var(--color-muted)]">
                   <span>Сумма</span>
@@ -467,10 +474,26 @@ export default function CheckoutPage() {
                 ))}
               </>
             )}
+            {personalWins && (
+              <>
+                <div className="summary-row text-[var(--color-muted)]">
+                  <span>Сумма</span>
+                  <span>{formatKzt(discountResult.subtotalKzt)}</span>
+                </div>
+                <div className="summary-row" style={{ color: "var(--color-success)" }}>
+                  <span>Скидка клиента ({clientDiscount.discountPercent}%)</span>
+                  <span>−{formatKzt(personalDiscountKzt)}</span>
+                </div>
+              </>
+            )}
             <div className="summary-row order-total-row">
               <span>Итого</span>
               <span className="summary-total">
-                {formatKzt(discountResult.discountKzt > 0 ? discountResult.totalKzt : totalKzt(kztRate))}
+                {formatKzt(
+                  personalWins || discountResult.discountKzt > 0
+                    ? summaryTotalKzt
+                    : totalKzt(kztRate)
+                )}
               </span>
             </div>
           </aside>

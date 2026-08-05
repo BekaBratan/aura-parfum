@@ -16,14 +16,21 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       toast.error("Неверный email или пароль");
       setLoading(false);
       return;
     }
     toast.success("Добро пожаловать!");
-    router.push("/admin");
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    router.push(profile?.role === "client" ? "/" : "/admin");
   };
 
   return (
