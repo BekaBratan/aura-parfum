@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ShoppingBag, Menu, X, Home, Layers } from "lucide-react";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
+import { useClientDiscount } from "@/lib/useClientDiscount";
 import { formatKzt } from "@/lib/currency";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
@@ -30,6 +31,7 @@ export default function Navbar() {
   const kztRate = useCurrencyStore((s) => s.kztRate);
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
+  const clientDiscount = useClientDiscount();
 
   useEffect(() => {
     setMounted(true);
@@ -81,6 +83,15 @@ export default function Navbar() {
             </nav>
 
             <div className="site-actions">
+              {clientDiscount.isClient && clientDiscount.discountPercent > 0 && (
+                <span
+                  className="vip-badge"
+                  title={`Ваша персональная скидка ${clientDiscount.discountPercent}%`}
+                >
+                  👑 −{clientDiscount.discountPercent}%
+                </span>
+              )}
+
               <Link
                 href="/cart"
                 className={`cart-header-button ${cartCount > 0 ? "has-items" : ""}`}
@@ -158,6 +169,11 @@ export default function Navbar() {
             <span>Корзина</span>
             {cartCount > 0 && <span className="mobile-menu-count">{cartCount}</span>}
           </Link>
+          {clientDiscount.isClient && clientDiscount.discountPercent > 0 && (
+            <span className="vip-badge" style={{ margin: "12px 20px" }}>
+              👑 Ваша скидка: {clientDiscount.discountPercent}%
+            </span>
+          )}
         </nav>
       </aside>
     </>

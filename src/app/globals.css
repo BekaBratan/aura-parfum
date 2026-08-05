@@ -331,6 +331,21 @@ img {
   background: var(--color-accent-dark);
 }
 
+.vip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: linear-gradient(135deg, #b8860b, #8a6a35);
+  box-shadow: 0 2px 10px rgba(201, 169, 110, 0.35);
+  white-space: nowrap;
+}
+
 .mobile-menu-backdrop {
   position: fixed;
   inset: 0;

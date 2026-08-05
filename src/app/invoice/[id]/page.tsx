@@ -255,29 +255,41 @@ export default function InvoicePage() {
             {(() => {
               const subtotal = order.items.reduce((s, i) => s + itemKzt(i.price_usd, i.category, effectiveRate) * i.quantity, 0);
               const discountKzt = Number(order.discount_kzt ?? 0);
-              const total = Math.max(0, subtotal - discountKzt);
-              return discountKzt > 0 ? (
+              const discountSum = Number(order.discount_sum ?? 0);
+              const total = Math.max(0, subtotal - discountKzt - discountSum);
+              const hasRule = discountKzt > 0;
+              const hasPersonal = discountSum > 0;
+              if (!hasRule && !hasPersonal) {
+                return (
+                  <div className="summary-row order-total-row">
+                    <span>Итого</span>
+                    <span className="summary-total">{formatKzt(total)}</span>
+                  </div>
+                );
+              }
+              return (
                 <>
                   <div className="summary-row" style={{ color: "var(--color-muted)" }}>
                     <span>Сумма</span>
                     <span>{formatKzt(subtotal)}</span>
                   </div>
-                  {(order.applied_discounts ?? []).map((a) => (
+                  {hasRule && (order.applied_discounts ?? []).map((a) => (
                     <div key={a.discount_id} className="summary-row" style={{ color: "var(--color-success)" }}>
                       <span>{a.name}</span>
                       <span>−{formatKzt(a.amount_kzt)}</span>
                     </div>
                   ))}
+                  {hasPersonal && (
+                    <div className="summary-row" style={{ color: "var(--color-success)" }}>
+                      <span>Персональная скидка ({order.discount_percent}%)</span>
+                      <span>−{formatKzt(discountSum)}</span>
+                    </div>
+                  )}
                   <div className="summary-row order-total-row">
                     <span>Итого</span>
                     <span className="summary-total">{formatKzt(total)}</span>
                   </div>
                 </>
-              ) : (
-                <div className="summary-row order-total-row">
-                  <span>Итого</span>
-                  <span className="summary-total">{formatKzt(total)}</span>
-                </div>
               );
             })()}
           </div>

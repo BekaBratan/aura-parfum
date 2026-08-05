@@ -163,11 +163,15 @@ export function buildInvoiceWhatsAppText(order: Order, siteUrl: string, kztRate:
     0,
   );
   const discountKzt = Number(order.discount_kzt ?? 0);
-  const total = Math.max(0, subtotal - discountKzt);
-  const discountLines = discountKzt > 0
+  const discountSum = Number(order.discount_sum ?? 0);
+  const total = Math.max(0, subtotal - discountKzt - discountSum);
+  const discountLines = discountKzt > 0 || discountSum > 0
     ? [
         `Сумма: ${formatKzt(subtotal)}`,
         ...(order.applied_discounts ?? []).map((a) => `${a.name}: −${formatKzt(a.amount_kzt)}`),
+        ...(discountSum > 0
+          ? [`Персональная скидка (${order.discount_percent}%): −${formatKzt(discountSum)}`]
+          : []),
       ]
     : [];
 

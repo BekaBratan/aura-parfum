@@ -364,21 +364,30 @@ export default function AdminOrders() {
               {(() => {
                 const subtotal = orderTotalKzt(detail.items, detail.kzt_rate ?? kztRate);
                 const discountKzt = Number(detail.discount_kzt ?? 0);
-                const total = Math.max(0, subtotal - discountKzt);
+                const discountSum = Number(detail.discount_sum ?? 0);
+                const total = Math.max(0, subtotal - discountKzt - discountSum);
+                const hasRule = discountKzt > 0;
+                const hasPersonal = discountSum > 0;
                 return (
                   <div className="border-t border-[var(--border)] pt-3 space-y-1">
-                    {discountKzt > 0 && (
+                    {(hasRule || hasPersonal) && (
                       <>
                         <div className="flex justify-between text-sm text-[var(--text-secondary)]">
                           <span>Сумма</span>
                           <span>{formatPrice(subtotal)}</span>
                         </div>
-                        {(detail.applied_discounts ?? []).map((a) => (
+                        {hasRule && (detail.applied_discounts ?? []).map((a) => (
                           <div key={a.discount_id} className="flex justify-between text-sm" style={{ color: "#4ade80" }}>
                             <span>{a.name}</span>
                             <span>−{formatPrice(a.amount_kzt)}</span>
                           </div>
                         ))}
+                        {hasPersonal && (
+                          <div className="flex justify-between text-sm" style={{ color: "#4ade80" }}>
+                            <span>Персональная скидка ({detail.discount_percent}%)</span>
+                            <span>−{formatPrice(discountSum)}</span>
+                          </div>
+                        )}
                       </>
                     )}
                     <div className="flex justify-between">

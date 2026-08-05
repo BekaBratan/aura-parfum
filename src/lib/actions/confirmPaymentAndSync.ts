@@ -60,14 +60,20 @@ export async function confirmPaymentAndSync(
     return { error: "В заказе нет товаров, привязанных к AinurPOS" };
   }
 
+  // The personal client discount is order-level: send its percent only when it
+  // was actually applied (discount_sum > 0), so AinurPOS never applies an
+  // extra percent on top of the already-discounted item prices.
+  const discountSum = Number(typed.discount_sum ?? 0);
+  const discountPercent = discountSum > 0 ? Number(typed.discount_percent ?? 0) : 0;
+
   try {
     await createAinurSale({
       status: true,
       store_id: storeId,
       customer_id: customerId,
       date: now,
-      discount_percent: 0,
-      discount_sum: Number(typed.discount_kzt ?? 0),
+      discount_percent: discountPercent,
+      discount_sum: discountSum,
       products: ainurItems,
       payment_details: {
         sum: Number(typed.total_display_currency ?? 0),

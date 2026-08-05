@@ -49,16 +49,27 @@ function buildProductCell(item: Order["items"][number]) {
 function buildPdfTotalsBlock(order: Order, kztRate: number) {
   const subtotal = order.items.reduce((s, i) => s + itemKzt(i.price_usd, i.category, kztRate) * i.quantity, 0);
   const discountKzt = Number(order.discount_kzt ?? 0);
-  const total = Math.max(0, subtotal - discountKzt);
-  if (discountKzt <= 0) {
+  const discountSum = Number(order.discount_sum ?? 0);
+  const total = Math.max(0, subtotal - discountKzt - discountSum);
+  if (discountKzt <= 0 && discountSum <= 0) {
     return [{ text: `Итого: ${formatKzt(total)}`, style: "total" }];
   }
-  const discountLines = (order.applied_discounts ?? []).map((a) => ({
-    text: `${a.name}: −${formatKzt(a.amount_kzt)}`,
-    alignment: "right" as const,
-    color: "#2a9d6e",
-    margin: [0, 2, 0, 0] as [number, number, number, number],
-  }));
+  const discountLines = [
+    ...(order.applied_discounts ?? []).map((a) => ({
+      text: `${a.name}: −${formatKzt(a.amount_kzt)}`,
+      alignment: "right" as const,
+      color: "#2a9d6e",
+      margin: [0, 2, 0, 0] as [number, number, number, number],
+    })),
+    ...(discountSum > 0
+      ? [{
+          text: `Персональная скидка (${order.discount_percent}%): −${formatKzt(discountSum)}`,
+          alignment: "right" as const,
+          color: "#2a9d6e",
+          margin: [0, 2, 0, 0] as [number, number, number, number],
+        }]
+      : []),
+  ];
   return [
     { text: `Сумма: ${formatKzt(subtotal)}`, alignment: "right" as const, margin: [0, 10, 0, 0] as [number, number, number, number], color: "#6f6a62" },
     ...discountLines,
