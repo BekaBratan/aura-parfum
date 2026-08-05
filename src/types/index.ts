@@ -61,7 +61,21 @@ export interface Order {
   discount_kzt?: number | null;
   applied_discounts?: AppliedDiscountLine[] | null;
   kzt_rate?: number;
+  // Personal client discount (GREATEST rule — only one of discount_kzt /
+  // discount_sum is ever > 0 on an order).
+  discount_percent?: number;
+  discount_sum?: number;
   created_at: string;
+}
+
+export interface UserProfile {
+  id: string;
+  role: "client";
+  discount_percent: number;
+  full_name: string | null;
+  phone: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type DiscountTriggerType =
