@@ -6,7 +6,7 @@ import { formatPriceUsd, formatPricePerUnit, getProductPrice, isKztPriced, itemP
 import { formatKzt } from "@/lib/currency";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
-import { useActiveDiscounts } from "@/lib/useDiscounts";
+import { useEffectiveDiscounts } from "@/lib/useDiscounts";
 import { calculateDiscounts } from "@/lib/discounts";
 import { Product, CartItem } from "@/types";
 import toast from "react-hot-toast";
@@ -42,7 +42,7 @@ export default function ProductCard({
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
   const kztRate = useCurrencyStore((s) => s.kztRate);
-  const activeDiscounts = useActiveDiscounts();
+  const { discounts: activeDiscounts, isClient, discountPercent } = useEffectiveDiscounts();
   const [imageError, setImageError] = useState(false);
 
   const cartItem = cartItems.find((i) => i.product_id === product.id);
@@ -208,6 +208,21 @@ export default function ProductCard({
     ? formatKzt(priceUsd)
     : formatPriceUsd(priceUsd, kztRate);
 
+  // Registered clients see only their personal discount — as a badge on
+  // масло/парфюм cards. It's independent of whether the item is in the cart.
+  const showPersonalBadge =
+    isClient && discountPercent > 0 && (product.category === "oil" || product.category === "perfume");
+  const discountedUsd = showPersonalBadge ? priceUsd * (1 - discountPercent / 100) : 0;
+  const personalDiscountedDisplay = showPersonalBadge
+    ? isMl
+      ? isKztPriced(product.category)
+        ? `${formatKzt(discountedUsd)} / мл`
+        : formatPricePerUnit(discountedUsd, "ml", kztRate)
+      : isKztPriced(product.category)
+        ? formatKzt(discountedUsd)
+        : formatPriceUsd(discountedUsd, kztRate)
+    : "";
+
   const countryCodes = useCountryStore((s) => s.codes);
   const countryCode = getCountryCode(countryCodes, product.country_of_origin);
 
@@ -219,7 +234,20 @@ export default function ProductCard({
   const availabilityText = isAvailable ? "В наличии" : "Нет в наличии";
 
   const renderVolumePriceInfo = () => {
-    if (!volumePriceInfo) return <p className="price">{priceDisplay}</p>;
+    if (!volumePriceInfo) {
+      if (showPersonalBadge) {
+        return (
+          <div className="volume-price-info">
+            <div className="volume-price-row">
+              <span className="volume-price-old">{priceDisplay}</span>
+              <span className="discount-badge">−{discountPercent}%</span>
+            </div>
+            <p className="volume-price-new is-discounted">{personalDiscountedDisplay}</p>
+          </div>
+        );
+      }
+      return <p className="price">{priceDisplay}</p>;
+    }
 
     const oldDisplay = isMl
       ? isKztPriced(product.category)

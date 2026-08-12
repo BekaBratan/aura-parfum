@@ -24,15 +24,27 @@ async function load() {
       cached = { userEmail: null, discountPercent: 0, isClient: false };
       return;
     }
-    const { data } = await supabase
-      .from("profiles")
-      .select("discount_percent, role")
-      .eq("id", user.id)
-      .maybeSingle();
+    const [profileRes, roleRes] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("discount_percent, role")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .in("role", ["admin", "cashier"])
+        .limit(1),
+    ]);
+
+    const profile = profileRes.data;
+    const isStaff = (roleRes.data ?? []).length > 0;
+
     cached = {
       userEmail: user.email ?? null,
-      discountPercent: Number(data?.discount_percent ?? 0),
-      isClient: data?.role === "client",
+      discountPercent: Number(profile?.discount_percent ?? 0),
+      isClient: profile?.role === "client" && !isStaff,
     };
   })();
   return fetchPromise;

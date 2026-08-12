@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useClientDiscount } from "@/lib/useClientDiscount";
 import type { Discount } from "@/types";
 
 type Listener = () => void;
@@ -68,4 +69,24 @@ export function useActiveDiscounts(): Discount[] {
       return true;
     });
   }, [discounts]);
+}
+
+/**
+ * Discounts that actually apply to the current shopper.
+ * Registered clients get ONLY their own personal discount — no general rule
+ * discounts are shown or applied to them, so the rules list is emptied out.
+ * Guests / staff keep all active rules.
+ */
+export function useEffectiveDiscounts(): {
+  discounts: Discount[];
+  isClient: boolean;
+  discountPercent: number;
+} {
+  const activeDiscounts = useActiveDiscounts();
+  const { isClient, discountPercent } = useClientDiscount();
+  const discounts = useMemo(
+    () => (isClient ? [] : activeDiscounts),
+    [isClient, activeDiscounts],
+  );
+  return { discounts, isClient, discountPercent };
 }
