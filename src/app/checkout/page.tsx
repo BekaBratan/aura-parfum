@@ -8,7 +8,7 @@ import { ArrowLeft, Loader2, MessageCircle, ShoppingBag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatPriceUsd, UNIT_LABELS, itemPriceKzt, isKztPriced } from "@/lib/utils";
 import { getOrderItemDetails } from "@/lib/orderItemDetails";
-import { useEffectiveDiscounts } from "@/lib/useDiscounts";
+import { useStoreDiscounts } from "@/lib/useDiscounts";
 import { calculateDiscounts } from "@/lib/discounts";
 import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
@@ -145,11 +145,14 @@ export default function CheckoutPage() {
     void refreshCartProducts();
   }, [mounted, productIdsKey, refreshCartProducts]);
 
-  const { discounts: activeDiscounts, discountPercent: clientDiscountPercent } =
-    useEffectiveDiscounts();
+  const { discounts, isClient, discountPercent } = useStoreDiscounts();
   const discountResult = useMemo(
-    () => calculateDiscounts(items, activeDiscounts, kztRate),
-    [items, activeDiscounts, kztRate],
+    () =>
+      calculateDiscounts(items, discounts, kztRate, new Date(), {
+        isClient,
+        personalPercent: discountPercent,
+      }),
+    [items, discounts, kztRate, isClient, discountPercent],
   );
   const lineByProductId = useMemo(
     () => new Map(discountResult.lines.map((l) => [l.product_id, l])),
@@ -160,24 +163,9 @@ export default function CheckoutPage() {
     [discountResult.applied],
   );
 
-  // Personal client discount — display only. Mirrors the server: registered
-  // clients get ONLY their personal discount, computed on the масло/парфюм
-  // subtotal. The server stays the source of truth for the totals.
-  const personalBaseKzt = useMemo(
-    () =>
-      items
-        .filter((i) => i.category === "oil" || i.category === "perfume")
-        .reduce((s, i) => s + itemPriceKzt(i.price_usd, i.category, kztRate) * i.quantity, 0),
-    [items, kztRate],
-  );
-  const personalDiscountKzt = useMemo(() => {
-    if (clientDiscountPercent <= 0) return 0;
-    return Math.round((personalBaseKzt * clientDiscountPercent / 100) * 100) / 100;
-  }, [clientDiscountPercent, personalBaseKzt]);
-  const personalWins = personalDiscountKzt > discountResult.discountKzt;
-  const summaryTotalKzt = personalWins
-    ? Math.max(0, discountResult.totalKzt - personalDiscountKzt)
-    : discountResult.totalKzt;
+  // Personal client discount is computed by the engine (hybrid): масло/парфюм
+  // lines take only the personal discount, other lines take general rules.
+  // Server stays the source of truth for the totals.
 
   if (!mounted) return null;
 
@@ -265,14 +253,26 @@ export default function CheckoutPage() {
       }
 
       // Recompute the discount against the freshest cart (after stock refresh).
-      const freshDiscount = calculateDiscounts(currentItems, activeDiscounts, kztRate);
+      const freshDiscount = calculateDiscounts(
+        currentItems,
+        discounts,
+        kztRate,
+        new Date(),
+        { isClient, personalPercent: discountPercent },
+      );
       const lineById = new Map(freshDiscount.lines.map((l) => [l.product_id, l]));
       const ruleNameById = new Map(freshDiscount.applied.map((a) => [a.discount_id, a.name]));
 
       const orderItems = currentItems.map((item) => {
         const line = lineById.get(item.product_id);
-        const ruleId = line?.appliedDiscountId ?? null;
+        // Per-line discount is sent only for general rule lines — the client's
+        // personal discount is re-derived server-side from the session.
+        const ruleId = line && !line.personalApplied ? line.appliedDiscountId ?? null : null;
         const ruleName = ruleId ? ruleNameById.get(ruleId) ?? null : null;
+        const ruleDiscountKzt =
+          line && !line.personalApplied && line.discountKzt > 0
+            ? Math.round(line.discountKzt * 100) / 100
+            : null;
         return {
           product_id: item.product_id,
           name: item.name,
@@ -284,8 +284,8 @@ export default function CheckoutPage() {
           volume_ml: item.volume_ml,
           image_url: item.image_url,
           ainur_id: item.ainur_id ?? null,
-          discount_kzt: line && line.discountKzt > 0 ? Math.round(line.discountKzt * 100) / 100 : null,
-          applied_discount_name: line && line.discountKzt > 0 ? ruleName : null,
+          discount_kzt: ruleDiscountKzt,
+          applied_discount_name: ruleDiscountKzt ? ruleName : null,
         };
       });
 
@@ -422,10 +422,12 @@ export default function CheckoutPage() {
                 const details = getOrderItemDetails(item);
                 const line = lineByProductId.get(item.product_id);
                 const baseKzt = itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity;
-                const ruleName = line?.appliedDiscountId
-                  ? ruleNameById.get(line.appliedDiscountId)
-                  : null;
-                const hasDiscount = line && line.discountKzt > 0 && !personalWins;
+                const note = line?.personalApplied
+                  ? discountPercent > 0 ? `Скидка клиента (${discountPercent}%)` : null
+                  : line?.appliedDiscountId
+                    ? `«${ruleNameById.get(line.appliedDiscountId)}»`
+                    : null;
+                const hasDiscount = line && line.discountKzt > 0;
                 return (
                   <div key={item.product_id} className="order-item">
                     <div className="order-item-main">
@@ -452,7 +454,7 @@ export default function CheckoutPage() {
                       <p className="product-meta">{item.quantity} {unitLabel}</p>
                       {hasDiscount && (
                         <p className="line-discount-note">
-                          {ruleName ? `«${ruleName}» ` : ""}−{formatKzt(line.discountKzt)}
+                          {note ? `${note} ` : ""}−{formatKzt(line.discountKzt)}
                         </p>
                       )}
                     </div>
@@ -466,7 +468,7 @@ export default function CheckoutPage() {
                 );
               })}
             </div>
-            {discountResult.discountKzt > 0 && !personalWins && (
+            {discountResult.discountKzt > 0 || discountResult.discountSumKzt > 0 ? (
               <>
                 <div className="summary-row text-[var(--color-muted)]">
                   <span>Сумма</span>
@@ -478,26 +480,20 @@ export default function CheckoutPage() {
                     <span>−{formatKzt(a.amount_kzt)}</span>
                   </div>
                 ))}
+                {discountResult.discountSumKzt > 0 && discountPercent > 0 && (
+                  <div className="summary-row" style={{ color: "var(--color-success)" }}>
+                    <span>Скидка клиента ({discountPercent}%)</span>
+                    <span>−{formatKzt(discountResult.discountSumKzt)}</span>
+                  </div>
+                )}
               </>
-            )}
-            {personalWins && (
-              <>
-                <div className="summary-row text-[var(--color-muted)]">
-                  <span>Сумма</span>
-                  <span>{formatKzt(discountResult.subtotalKzt)}</span>
-                </div>
-                <div className="summary-row" style={{ color: "var(--color-success)" }}>
-                  <span>Скидка клиента ({clientDiscountPercent}%)</span>
-                  <span>−{formatKzt(personalDiscountKzt)}</span>
-                </div>
-              </>
-            )}
+            ) : null}
             <div className="summary-row order-total-row">
               <span>Итого</span>
               <span className="summary-total">
                 {formatKzt(
-                  personalWins || discountResult.discountKzt > 0
-                    ? summaryTotalKzt
+                  discountResult.discountKzt > 0 || discountResult.discountSumKzt > 0
+                    ? discountResult.totalKzt
                     : totalKzt(kztRate)
                 )}
               </span>

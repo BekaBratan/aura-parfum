@@ -9,7 +9,7 @@ import { applyStockOverlay, fetchAinurStockMap } from "@/lib/ainur/stockOverlay"
 import { itemPriceKzt } from "@/lib/utils";
 import { formatKzt } from "@/lib/currency";
 import { useCurrencyStore } from "@/store/currencyStore";
-import { useEffectiveDiscounts } from "@/lib/useDiscounts";
+import { useStoreDiscounts } from "@/lib/useDiscounts";
 import { calculateDiscounts } from "@/lib/discounts";
 import Link from "next/link";
 import { Trash2, ShoppingBag, ArrowRight } from "lucide-react";
@@ -86,11 +86,14 @@ export default function CartPage() {
   );
   const hasInvalidStock = stockWarnings.length > 0;
 
-  const { discounts: activeDiscounts, discountPercent: clientDiscountPercent } =
-    useEffectiveDiscounts();
+  const { discounts, isClient, discountPercent } = useStoreDiscounts();
   const discountResult = useMemo(
-    () => calculateDiscounts(items, activeDiscounts, kztRate),
-    [items, activeDiscounts, kztRate],
+    () =>
+      calculateDiscounts(items, discounts, kztRate, new Date(), {
+        isClient,
+        personalPercent: discountPercent,
+      }),
+    [items, discounts, kztRate, isClient, discountPercent],
   );
   const lineByProductId = useMemo(
     () => new Map(discountResult.lines.map((l) => [l.product_id, l])),
@@ -101,24 +104,9 @@ export default function CartPage() {
     [discountResult.applied],
   );
 
-  // Personal client discount — display only. Mirrors the server: registered
-  // clients get ONLY their personal discount, computed on the масло/парфюм
-  // subtotal. The server stays the source of truth for the totals.
-  const personalBaseKzt = useMemo(
-    () =>
-      items
-        .filter((i) => i.category === "oil" || i.category === "perfume")
-        .reduce((s, i) => s + itemPriceKzt(i.price_usd, i.category, kztRate) * i.quantity, 0),
-    [items, kztRate],
-  );
-  const personalDiscountKzt = useMemo(() => {
-    if (clientDiscountPercent <= 0) return 0;
-    return Math.round((personalBaseKzt * clientDiscountPercent / 100) * 100) / 100;
-  }, [clientDiscountPercent, personalBaseKzt]);
-  const personalWins = personalDiscountKzt > discountResult.discountKzt;
-  const summaryTotalKzt = personalWins
-    ? Math.max(0, discountResult.totalKzt - personalDiscountKzt)
-    : discountResult.totalKzt;
+  // Personal client discount is computed by the engine (hybrid): масло/парфюм
+  // lines take only the personal discount, other lines take general rules.
+  // Server stays the source of truth for the totals.
 
   const MIN_ORDER_KZT = 30000;
   const refreshCartProducts = useCallback(
@@ -362,16 +350,18 @@ export default function CartPage() {
                   {(() => {
                     const line = lineByProductId.get(item.product_id);
                     const baseKzt = itemPriceKzt(item.price_usd, item.category, kztRate) * item.quantity;
-                    if (line && line.discountKzt > 0 && !personalWins) {
-                      const ruleName = line.appliedDiscountId
-                        ? ruleNameById.get(line.appliedDiscountId)
-                        : null;
+                    if (line && line.discountKzt > 0) {
+                      const note = line.personalApplied
+                        ? discountPercent > 0 ? `Скидка клиента (${discountPercent}%)` : null
+                        : line.appliedDiscountId
+                          ? `«${ruleNameById.get(line.appliedDiscountId)}»`
+                          : null;
                       return (
                         <>
                           <p className="price price-old">{formatKzt(baseKzt)}</p>
                           <p className="price">{formatKzt(line.finalKzt)}</p>
                           <p className="line-discount-note">
-                            {ruleName ? `«${ruleName}» ` : ""}−{formatKzt(line.discountKzt)}
+                            {note ? `${note} ` : ""}−{formatKzt(line.discountKzt)}
                           </p>
                         </>
                       );
@@ -388,7 +378,7 @@ export default function CartPage() {
         </div>
 
         <div className="card summary-card">
-          {discountResult.discountKzt > 0 && !personalWins ? (
+          {discountResult.discountKzt > 0 || discountResult.discountSumKzt > 0 ? (
             <>
               <div className="summary-row text-[var(--color-muted)]">
                 <span>Сумма</span>
@@ -400,24 +390,15 @@ export default function CartPage() {
                   <span>−{formatKzt(a.amount_kzt)}</span>
                 </div>
               ))}
+              {discountResult.discountSumKzt > 0 && discountPercent > 0 && (
+                <div className="summary-row" style={{ color: "var(--color-success)" }}>
+                  <span>Скидка клиента ({discountPercent}%)</span>
+                  <span>−{formatKzt(discountResult.discountSumKzt)}</span>
+                </div>
+              )}
               <div className="summary-row">
                 <span>Итого</span>
                 <span className="summary-total">{formatKzt(discountResult.totalKzt)}</span>
-              </div>
-            </>
-          ) : personalWins ? (
-            <>
-              <div className="summary-row text-[var(--color-muted)]">
-                <span>Сумма</span>
-                <span>{formatKzt(discountResult.subtotalKzt)}</span>
-              </div>
-              <div className="summary-row" style={{ color: "var(--color-success)" }}>
-                <span>Скидка клиента ({clientDiscountPercent}%)</span>
-                <span>−{formatKzt(personalDiscountKzt)}</span>
-              </div>
-              <div className="summary-row">
-                <span>Итого</span>
-                <span className="summary-total">{formatKzt(summaryTotalKzt)}</span>
               </div>
             </>
           ) : (

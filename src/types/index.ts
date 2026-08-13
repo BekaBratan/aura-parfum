@@ -61,8 +61,9 @@ export interface Order {
   discount_kzt?: number | null;
   applied_discounts?: AppliedDiscountLine[] | null;
   kzt_rate?: number;
-  // Personal client discount (GREATEST rule — only one of discount_kzt /
-  // discount_sum is ever > 0 on an order).
+  // Personal client discount. On a registered client's order BOTH can be > 0:
+  // discount_kzt = general rule discounts (on non-oil/perfume lines),
+  // discount_sum = the client's personal discount on масло/парфюм lines.
   discount_percent?: number;
   discount_sum?: number;
   created_at: string;

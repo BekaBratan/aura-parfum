@@ -72,21 +72,20 @@ export function useActiveDiscounts(): Discount[] {
 }
 
 /**
- * Discounts that actually apply to the current shopper.
- * Registered clients get ONLY their own personal discount — no general rule
- * discounts are shown or applied to them, so the rules list is emptied out.
- * Guests / staff keep all active rules.
+ * Discounts and client context for the storefront.
+ * For a registered client the general rules still apply — but the hybrid
+ * engine confines them to non-oil/perfume lines. `isClient`/`discountPercent`
+ * drive the personal discount path.
  */
-export function useEffectiveDiscounts(): {
+export function useStoreDiscounts(): {
   discounts: Discount[];
   isClient: boolean;
   discountPercent: number;
 } {
-  const activeDiscounts = useActiveDiscounts();
+  const discounts = useActiveDiscounts();
   const { isClient, discountPercent } = useClientDiscount();
-  const discounts = useMemo(
-    () => (isClient ? [] : activeDiscounts),
-    [isClient, activeDiscounts],
+  return useMemo(
+    () => ({ discounts, isClient, discountPercent }),
+    [discounts, isClient, discountPercent],
   );
-  return { discounts, isClient, discountPercent };
 }

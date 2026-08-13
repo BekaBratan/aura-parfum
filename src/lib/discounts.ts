@@ -136,6 +136,21 @@ function calcDiscountAmount(d: Discount, baseKzt: number, kztRate: number): numb
   return Math.min(Math.round(valueKzt * 100) / 100, baseKzt);
 }
 
+/**
+ * Personal client discount for a single масло/парфюм line.
+ *
+ * ROUNDING CONTRACT (must match the SQL in atomic_checkout_v10.sql):
+ * the line base is rounded to whole tenge first, then the percent is applied
+ * and the result is rounded to 2 decimals — PER LINE, then summed. This keeps
+ * client display and server-checked totals identical to the tenge.
+ */
+function calcPersonalAmount(baseKzt: number, percent: number): number {
+  if (baseKzt <= 0 || percent <= 0) return 0;
+  const pct = Math.min(100, Math.max(0, percent));
+  const lineBase = Math.round(baseKzt);
+  return Math.round((lineBase * pct / 100) * 100) / 100;
+}
+
 // ─── Public engine ─────────────────────────────────────────────────────────
 
 export interface DiscountedLine {
@@ -145,18 +160,28 @@ export interface DiscountedLine {
   discountKzt: number;
   finalKzt: number;
   appliedDiscountId: string | null;
+  /** True when the cut came from the client's personal discount (масло/парфюм lines). */
+  personalApplied?: boolean;
 }
 
 export interface DiscountResult {
   lines: DiscountedLine[];
   subtotalKzt: number;
+  /** Sum of general rule discounts. */
   discountKzt: number;
+  /** Sum of the registered client's personal discount on масло/парфюм lines. */
+  discountSumKzt: number;
   totalKzt: number;
   applied: AppliedDiscountLine[];
 }
 
+export interface ClientDiscountContext {
+  isClient: boolean;
+  personalPercent: number;
+}
+
 const EMPTY_RESULT: DiscountResult = {
-  lines: [], subtotalKzt: 0, discountKzt: 0, totalKzt: 0, applied: [],
+  lines: [], subtotalKzt: 0, discountKzt: 0, discountSumKzt: 0, totalKzt: 0, applied: [],
 };
 
 /**
@@ -168,17 +193,24 @@ const EMPTY_RESULT: DiscountResult = {
  * the higher `priority` value wins; remaining ties fall back to id order
  * for deterministic output.
  *
+ * HYBRID (registered clients): when `client` is passed and `isClient` is true,
+ * масло/парфюм lines take ONLY the personal discount (personalPercent);
+ * general rules never apply to those lines but still apply to the other
+ * categories. Rules' triggers are evaluated against the whole cart.
+ *
  * Returned amounts:
- *   - `subtotalKzt`: cart total before any discount
- *   - `discountKzt`: sum of all per-line discounts
- *   - `totalKzt`:    `max(0, subtotalKzt - discountKzt)` — never negative
- *   - `applied`:     per-rule aggregate, suitable for storing on the order
+ *   - `subtotalKzt`:  cart total before any discount
+ *   - `discountKzt`:  sum of general rule discounts
+ *   - `discountSumKzt`: sum of the client's personal discounts (masло/парфюм)
+ *   - `totalKzt`:     `max(0, subtotalKzt - discountKzt - discountSumKzt)`
+ *   - `applied`:      per-rule aggregate, suitable for storing on the order
  */
 export function calculateDiscounts(
   cartItems: CartItem[],
   discounts: Discount[],
   kztRate: number,
   now: Date = new Date(),
+  client?: ClientDiscountContext,
 ): DiscountResult {
   if (cartItems.length === 0) return EMPTY_RESULT;
 
@@ -187,12 +219,40 @@ export function calculateDiscounts(
   const subtotalKzt = lineKzts.reduce((s, v) => s + v, 0);
 
   // Active + in window + trigger-condition satisfied.
+  // Triggers always evaluate over the WHOLE cart (personal discount doesn't
+  // disable promos — it only confines them to non-oil/perfume lines).
   const candidates = discounts.filter(
     (d) => d.is_active && isWithinValidity(d, now) && triggerMet(d, cartItems, lineUsds, lineKzts),
   );
 
   const lines: DiscountedLine[] = cartItems.map((item, i) => {
     const baseKzt = lineKzts[i];
+
+    // Registered clients: масло/парфюм lines take ONLY the personal discount,
+    // general rules never touch them.
+    if (
+      client?.isClient &&
+      (item.category === "oil" || item.category === "perfume")
+    ) {
+      const personalAmount = calcPersonalAmount(baseKzt, client.personalPercent);
+      if (personalAmount <= 0) {
+        return {
+          product_id: item.product_id,
+          baseKzt, baseUsd: lineUsds[i],
+          discountKzt: 0, finalKzt: baseKzt,
+          appliedDiscountId: null, personalApplied: true,
+        };
+      }
+      return {
+        product_id: item.product_id,
+        baseKzt, baseUsd: lineUsds[i],
+        discountKzt: personalAmount,
+        finalKzt: Math.max(0, baseKzt - personalAmount),
+        appliedDiscountId: null,
+        personalApplied: true,
+      };
+    }
+
     let best: { d: Discount; amount: number } | null = null;
     for (const d of candidates) {
       // For per-line apply rules the engine re-checks the threshold against the
@@ -249,12 +309,20 @@ export function calculateDiscounts(
   }
   for (const snap of byRule.values()) snap.amount_kzt = Math.round(snap.amount_kzt * 100) / 100;
 
-  const discountKzt = lines.reduce((s, l) => s + l.discountKzt, 0);
+  const discountKzt = lines.reduce(
+    (s, l) => s + (l.personalApplied ? 0 : l.discountKzt),
+    0,
+  );
+  const discountSumKzt = lines.reduce(
+    (s, l) => s + (l.personalApplied ? l.discountKzt : 0),
+    0,
+  );
   return {
     lines,
     subtotalKzt,
     discountKzt,
-    totalKzt: Math.max(0, subtotalKzt - discountKzt),
+    discountSumKzt,
+    totalKzt: Math.max(0, subtotalKzt - discountKzt - discountSumKzt),
     applied: [...byRule.values()],
   };
 }

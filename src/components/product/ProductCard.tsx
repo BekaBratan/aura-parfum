@@ -6,7 +6,7 @@ import { formatPriceUsd, formatPricePerUnit, getProductPrice, isKztPriced, itemP
 import { formatKzt } from "@/lib/currency";
 import { useCartStore } from "@/store/cartStore";
 import { useCurrencyStore } from "@/store/currencyStore";
-import { useEffectiveDiscounts } from "@/lib/useDiscounts";
+import { useStoreDiscounts } from "@/lib/useDiscounts";
 import { calculateDiscounts } from "@/lib/discounts";
 import { Product, CartItem } from "@/types";
 import toast from "react-hot-toast";
@@ -42,7 +42,7 @@ export default function ProductCard({
   const updateQuantity = useCartStore((s) => s.updateQuantity);
   const removeItem = useCartStore((s) => s.removeItem);
   const kztRate = useCurrencyStore((s) => s.kztRate);
-  const { discounts: activeDiscounts, isClient, discountPercent } = useEffectiveDiscounts();
+  const { discounts: activeDiscounts, isClient, discountPercent } = useStoreDiscounts();
   const [imageError, setImageError] = useState(false);
 
   const cartItem = cartItems.find((i) => i.product_id === product.id);
@@ -84,7 +84,10 @@ export default function ProductCard({
       code: product.code ?? null,
     };
 
-    const result = calculateDiscounts([virtualItem], activeDiscounts, kztRate);
+    const result = calculateDiscounts([virtualItem], activeDiscounts, kztRate, new Date(), {
+      isClient,
+      personalPercent: discountPercent,
+    });
     const line = result.lines[0];
 
     if (line && line.discountKzt > 0) {
@@ -99,7 +102,7 @@ export default function ProductCard({
 
     const base = itemPriceKzt(unitPrice, category, kztRate) * qty;
     return { baseKzt: base, finalKzt: base, discountKzt: 0, percentage: 0, hasDiscount: false as const };
-  }, [isInCart, cartItem, priceUsd, product.id, product.name, product.brand, product.image_url, product.image_thumb_url, product.unit, product.category, product.attributes, product.gender, product.country_of_origin, product.code, productCount, activeDiscounts, kztRate, isMl]);
+  }, [isInCart, cartItem, priceUsd, product.id, product.name, product.brand, product.image_url, product.image_thumb_url, product.unit, product.category, product.attributes, product.gender, product.country_of_origin, product.code, productCount, activeDiscounts, kztRate, isMl, isClient, discountPercent]);
 
   const cardClassName = [
     "product-card",
